@@ -5,5 +5,9 @@ library('obs-vaapi',
     dependencies : [
         dependency('libobs'),
         dependency('gstreamer-1.0'),
+        dependency('gstreamer-app-1.0'),
     ],
+    name_prefix : '',
+    install : true,
+    install_dir : join_paths(get_option('libdir'), 'obs-plugins'),
 )

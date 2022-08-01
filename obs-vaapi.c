@@ -20,7 +20,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	vaapi->encoder = encoder;
 
 	GError *err = NULL;
-	vaapi->pipe = gst_parse_launch(NULL, &err);
+	vaapi->pipe =
+		gst_parse_launch("vaapih264enc name=encoder ! fakesink", &err);
 	if (err) {
 		blog(LOG_ERROR, "[obs-vaapi] %s", err->message);
 
@@ -29,6 +30,44 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		return NULL;
 	}
+
+	GstElement *element =
+		gst_bin_get_by_name(GST_BIN(vaapi->pipe), "encoder");
+
+	for (obs_property_t *property =
+		     obs_properties_first(obs_encoder_properties(encoder));
+	     property; obs_property_next(&property)) {
+
+		blog(LOG_INFO, "%s", (obs_property_name(property)));
+
+		switch (obs_property_get_type(property)) {
+		case OBS_PROPERTY_TEXT:
+			g_object_set(element, obs_property_name(property),
+				     obs_data_get_string(
+					     settings,
+					     obs_property_name(property)),
+				     NULL);
+			break;
+		case OBS_PROPERTY_INT:
+			g_object_set(
+				element, obs_property_name(property),
+				obs_data_get_int(settings,
+						 obs_property_name(property)),
+				NULL);
+			break;
+		case OBS_PROPERTY_FLOAT:
+			g_object_set(element, obs_property_name(property),
+				     obs_data_get_double(
+					     settings,
+					     obs_property_name(property)),
+				     NULL);
+			break;
+		default:
+			break;
+		}
+	}
+
+	gst_object_unref(element);
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 

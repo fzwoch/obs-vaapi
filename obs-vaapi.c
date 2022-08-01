@@ -51,37 +51,14 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 }
 
 /*
--> name
--> parent
--> qos
--> min-force-key-unit-interval
--> bitrate
--> target-percentage
--> keyframe-period
--> quality-level
--> default-roi-delta-qp
--> trellis
--> rate-control
--> tune
--> max-bframes
--> init-qp
--> min-qp
--> num-slices
--> cabac
--> dct8x8
--> cpb-length
--> num-views
--> view-ids
--> aud
--> compliance-mode
--> refs
--> mbbrc
--> qp-ip
--> qp-ib
--> temporal-levels
--> prediction-type
--> max-qp
--> quality-factor
+
+warning: [obs-vaapi] unhandled property: rate-control
+warning: [obs-vaapi] unhandled property: tune
+warning: [obs-vaapi] unhandled property: view-ids
+warning: [obs-vaapi] unhandled property: compliance-mode
+warning: [obs-vaapi] unhandled property: mbbrc
+warning: [obs-vaapi] unhandled property: prediction-type
+
 
 */
 
@@ -98,8 +75,16 @@ static void get_defaults(obs_data_t *settings) {
     GParamSpec **property_specs = g_object_class_list_properties(G_OBJECT_GET_CLASS(encoder), &num_properties);
 
     for (guint i = 0; i < num_properties; i++) {
-        GValue value = { 0, };
         GParamSpec *param = property_specs[i];
+
+        if (param->owner_type == GST_TYPE_PAD ||
+            param->owner_type == G_TYPE_OBJECT ||
+            param->owner_type == GST_TYPE_OBJECT) {
+            continue;
+        }
+
+        GValue value = { 0, };
+        g_value_init(&value, param->value_type);
 
         g_object_get_property(G_OBJECT(encoder), param->name, &value);
 
@@ -133,6 +118,7 @@ static void get_defaults(obs_data_t *settings) {
         }
     }
 
+    g_free(property_specs);
     gst_object_unref(encoder);
     gst_object_unref(factory);
 }
@@ -153,8 +139,16 @@ static obs_properties_t* get_properties(void *data) {
     GParamSpec **property_specs = g_object_class_list_properties(G_OBJECT_GET_CLASS(encoder), &num_properties);
 
     for (guint i = 0; i < num_properties; i++) {
-        GValue value = { 0, };
         GParamSpec *param = property_specs[i];
+
+        if (param->owner_type == GST_TYPE_PAD ||
+            param->owner_type == G_TYPE_OBJECT ||
+            param->owner_type == GST_TYPE_OBJECT) {
+            continue;
+        }
+
+        GValue value = { 0, };
+        g_value_init(&value, param->value_type);
 
         g_object_get_property(G_OBJECT(encoder), param->name, &value);
 
@@ -193,6 +187,7 @@ static obs_properties_t* get_properties(void *data) {
         }
     }
 
+    g_free(property_specs);
     gst_object_unref(encoder);
     gst_object_unref(factory);
 

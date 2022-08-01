@@ -55,6 +55,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 						 obs_property_name(property)),
 				NULL);
 			break;
+		case OBS_PROPERTY_BOOL:
+			g_object_set(
+				element, obs_property_name(property),
+				obs_data_get_bool(settings,
+						  obs_property_name(property)),
+				NULL);
+			break;
 		case OBS_PROPERTY_FLOAT:
 			g_object_set(element, obs_property_name(property),
 				     obs_data_get_double(
@@ -63,6 +70,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 				     NULL);
 			break;
 		default:
+			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
+			     obs_property_name(property));
 			break;
 		}
 	}
@@ -281,7 +290,7 @@ bool obs_module_load(void)
 	gst_init(NULL, NULL);
 
 	struct obs_encoder_info vaapi = {
-		.id = "obs-vaapi",
+		.id = "obs-vaapi-h264",
 		.type = OBS_ENCODER_VIDEO,
 		.codec = "h264",
 		.get_name = get_name,

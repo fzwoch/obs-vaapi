@@ -51,7 +51,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	vaapi->encoder = encoder;
 
 	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
-	const char* codec = obs_encoder_get_codec(encoder);
+	const char *codec = obs_encoder_get_codec(encoder);
 
 	GError *err = NULL;
 	vaapi->pipe = gst_parse_launch(
@@ -136,7 +136,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 static void destroy(void *data)
 {
 	obs_vaapi_t *vaapi = (obs_vaapi_t *)data;
-	g_print("DESTROY1\n");
+
 	if (vaapi->pipe) {
 		gst_element_set_state(vaapi->pipe, GST_STATE_NULL);
 
@@ -144,19 +144,17 @@ static void destroy(void *data)
 		gst_bus_remove_watch(bus);
 		gst_object_unref(bus);
 
-		g_print("DESTROY2\n");
 		gst_object_unref(vaapi->appsink);
 		gst_object_unref(vaapi->appsrc);
 		gst_object_unref(vaapi->pipe);
 	}
-	g_print("DESTROY3\n");
+
 	if (vaapi->sample) {
 		GstBuffer *buffer = gst_sample_get_buffer(vaapi->sample);
 		gst_buffer_unmap(buffer, &vaapi->info);
 		gst_sample_unref(vaapi->sample);
 		vaapi->sample = NULL;
 	}
-	g_print("DESTROY4\n");
 
 	bfree(vaapi);
 }
@@ -233,8 +231,6 @@ static bool encode(void *data, struct encoder_frame *frame,
 
 	packet->keyframe =
 		!GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
-
-	g_print("-> %ld, %ld, %ld\n", packet->pts, packet->dts, packet->size);
 
 	return true;
 }

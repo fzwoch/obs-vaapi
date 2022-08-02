@@ -41,16 +41,17 @@ static gboolean bus_callback(GstBus *bus, GstMessage *message,
 
 static const char *get_name(void *type_data)
 {
-	return "VAAPI H.264";
+	return (const char *)type_data;
 }
 
 static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	obs_vaapi_t *vaapi = bzalloc(sizeof(obs_vaapi_t));
 
-	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
-
 	vaapi->encoder = encoder;
+
+	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
+	const char* codec = obs_encoder_get_codec(encoder);
 
 	GError *err = NULL;
 	vaapi->pipe = gst_parse_launch(
@@ -237,18 +238,6 @@ static bool encode(void *data, struct encoder_frame *frame,
 
 	return true;
 }
-
-/*
-
-warning: [obs-vaapi] unhandled property: rate-control
-warning: [obs-vaapi] unhandled property: tune
-warning: [obs-vaapi] unhandled property: view-ids
-warning: [obs-vaapi] unhandled property: compliance-mode
-warning: [obs-vaapi] unhandled property: mbbrc
-warning: [obs-vaapi] unhandled property: prediction-type
-
-
-*/
 
 static void get_defaults(obs_data_t *settings)
 {
@@ -455,11 +444,14 @@ bool obs_module_load(void)
 		.get_properties = get_properties,
 		.encode = encode,
 		.get_extra_data = get_extra_data,
-		/*     .update         = my_encoder_update,
-		.get_sei_data   = my_encoder_sei,
-		.get_video_info = my_encoder_video_info
-		*/
+		.type_data = "VAAPI H.264",
 	};
+
+	obs_register_encoder(&vaapi);
+
+	vaapi.id = "obs-vaapi-h265";
+	vaapi.codec = "hevc";
+	vaapi.type_data = "VAAPI H.265";
 
 	obs_register_encoder(&vaapi);
 

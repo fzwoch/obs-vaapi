@@ -32,9 +32,8 @@ typedef struct {
 	GstElement *appsink;
 	GstSample *sample;
 	GstMapInfo info;
-
-	guint8 *codec_data;
-	size_t codec_data_size;
+	GstSample *first;
+	GstMapInfo first_info;
 } obs_vaapi_t;
 
 static gboolean bus_callback(GstBus *bus, GstMessage *message,
@@ -183,7 +182,12 @@ static void destroy(void *data)
 		GstBuffer *buffer = gst_sample_get_buffer(vaapi->sample);
 		gst_buffer_unmap(buffer, &vaapi->info);
 		gst_sample_unref(vaapi->sample);
-		vaapi->sample = NULL;
+	}
+
+	if (vaapi->first) {
+		GstBuffer *buffer = gst_sample_get_buffer(vaapi->first);
+		gst_buffer_unmap(buffer, &vaapi->first_info);
+		gst_sample_unref(vaapi->first);
 	}
 
 	bfree(vaapi);
@@ -216,35 +220,23 @@ static bool encode(void *data, struct encoder_frame *frame,
 
 	gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
 
-	GstSample *sample =
+	vaapi->sample =
 		gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);
-	if (sample == NULL) {
+	if (vaapi->sample == NULL) {
 		return true;
+	}
+
+	if (vaapi->first == NULL) {
+		vaapi->first = gst_sample_copy(vaapi->sample);
+		GstBuffer *buffer = gst_sample_get_buffer(vaapi->first);
+		gst_buffer_map(buffer, &vaapi->first_info, GST_MAP_READ);
 	}
 
 	*received_packet = true;
 
-	buffer = gst_sample_get_buffer(sample);
+	buffer = gst_sample_get_buffer(vaapi->sample);
 
 	gst_buffer_map(buffer, &vaapi->info, GST_MAP_READ);
-
-	if (vaapi->codec_data == NULL) {
-		size_t size;
-
-		// this is pretty lazy..
-		for (size = 0; size < vaapi->info.size; size++) {
-			if (vaapi->info.data[size + 0] == 0 &&
-			    vaapi->info.data[size + 1] == 0 &&
-			    vaapi->info.data[size + 2] == 0 &&
-			    vaapi->info.data[size + 3] == 1 &&
-			    (vaapi->info.data[size + 4] & 0x1f) == 5) {
-				break;
-			}
-		}
-
-		vaapi->codec_data = g_memdup(vaapi->info.data, size);
-		vaapi->codec_data_size = size;
-	}
 
 	packet->data = vaapi->info.data;
 	packet->size = vaapi->info.size;
@@ -439,12 +431,12 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 {
 	obs_vaapi_t *vaapi = (obs_vaapi_t *)data;
 
-	if (vaapi->codec_data == NULL) {
+	if (vaapi->first == NULL) {
 		return false;
 	}
 
-	*extra_data = vaapi->codec_data;
-	*size = vaapi->codec_data_size;
+	*extra_data = vaapi->first_info.data;
+	*size = vaapi->first_info.size;
 
 	return true;
 }
@@ -467,19 +459,34 @@ bool obs_module_load(void)
 		.type_data = "VAAPI H.264",
 	};
 
-	obs_register_encoder(&vaapi);
+	GstElementFactory *factory = gst_element_factory_find("vaapih264enc");
+	if (factory) {
+		gst_object_unref(factory);
+		blog(LOG_INFO, "[obs-vaapi] found H.264 support");
+		obs_register_encoder(&vaapi);
+	}
 
 	vaapi.id = "obs-vaapi-h265";
 	vaapi.codec = "hevc";
 	vaapi.type_data = "VAAPI H.265";
 
-	obs_register_encoder(&vaapi);
+	factory = gst_element_factory_find("vaapih265enc");
+	if (factory) {
+		gst_object_unref(factory);
+		blog(LOG_INFO, "[obs-vaapi] found H.265 support");
+		obs_register_encoder(&vaapi);
+	}
 
 	vaapi.id = "obs-vaapi-av1";
 	vaapi.codec = "av1";
 	vaapi.type_data = "VAAPI AV1";
 
-	obs_register_encoder(&vaapi);
+	factory = gst_element_factory_find("vaapiav1enc");
+	if (factory) {
+		gst_object_unref(factory);
+		blog(LOG_INFO, "[obs-vaapi] found AV1 support");
+		obs_register_encoder(&vaapi);
+	}
 
 	return true;
 }

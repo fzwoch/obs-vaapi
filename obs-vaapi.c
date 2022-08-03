@@ -32,8 +32,8 @@ typedef struct {
 	GstElement *appsink;
 	GstSample *sample;
 	GstMapInfo info;
-	GstSample *first;
-	GstMapInfo first_info;
+	void *codec_data;
+	size_t codec_size;
 } obs_vaapi_t;
 
 static gboolean bus_callback(GstBus *bus, GstMessage *message,
@@ -184,12 +184,7 @@ static void destroy(void *data)
 		gst_sample_unref(vaapi->sample);
 	}
 
-	if (vaapi->first) {
-		GstBuffer *buffer = gst_sample_get_buffer(vaapi->first);
-		gst_buffer_unmap(buffer, &vaapi->first_info);
-		gst_sample_unref(vaapi->first);
-	}
-
+	bfree(vaapi->codec_data);
 	bfree(vaapi);
 }
 
@@ -226,17 +221,16 @@ static bool encode(void *data, struct encoder_frame *frame,
 		return true;
 	}
 
-	if (vaapi->first == NULL) {
-		vaapi->first = gst_sample_copy(vaapi->sample);
-		GstBuffer *buffer = gst_sample_get_buffer(vaapi->first);
-		gst_buffer_map(buffer, &vaapi->first_info, GST_MAP_READ);
-	}
-
 	*received_packet = true;
 
 	buffer = gst_sample_get_buffer(vaapi->sample);
 
 	gst_buffer_map(buffer, &vaapi->info, GST_MAP_READ);
+
+	if (vaapi->codec_data == NULL) {
+		vaapi->codec_data = bmemdup(vaapi->info.data, vaapi->info.size);
+		vaapi->codec_size = vaapi->info.size;
+	}
 
 	packet->data = vaapi->info.data;
 	packet->size = vaapi->info.size;
@@ -431,12 +425,12 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 {
 	obs_vaapi_t *vaapi = (obs_vaapi_t *)data;
 
-	if (vaapi->first == NULL) {
+	if (vaapi->codec_data == NULL) {
 		return false;
 	}
 
-	*extra_data = vaapi->first_info.data;
-	*size = vaapi->first_info.size;
+	*extra_data = vaapi->codec_data;
+	*size = vaapi->codec_size;
 
 	return true;
 }

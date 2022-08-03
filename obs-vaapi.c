@@ -1,3 +1,24 @@
+
+/*
+ * obs-vaapi. OBS Studio plugin.
+ * Copyright (C) 2022 Florian Zwoch <fzwoch@gmail.com>
+ *
+ * This file is part of obs-vaapi.
+ *
+ * obs-vaapi is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * obs-vaapi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with obs-vaapi. If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
@@ -51,23 +72,32 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	vaapi->encoder = encoder;
 
 	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
-	const char *codec = obs_encoder_get_codec(encoder);
 
-	GError *err = NULL;
-	vaapi->pipe = gst_parse_launch(
-		"appsrc name=appsrc ! vaapih264enc name=encoder ! h264parse ! video/x-h264, stream-format=byte-stream, alignment=au ! appsink sync=false name=appsink",
-		&err);
-	if (err) {
-		blog(LOG_ERROR, "[obs-vaapi] %s", err->message);
+	GstElement *vaapiencoder = NULL;
+	GstElement *parser = NULL;
 
-		g_error_free(err);
+	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
+		vaapiencoder = gst_element_factory_make("vaapih264enc", NULL);
+		parser = gst_element_factory_make("h264parse", NULL);
+	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "hevc") == 0) {
+		vaapiencoder = gst_element_factory_make("vaapih265enc", NULL);
+		parser = gst_element_factory_make("h265parse", NULL);
+	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "av1") == 0) {
+		vaapiencoder = gst_element_factory_make("vaapiav1enc", NULL);
+		parser = gst_element_factory_make("av1parse", NULL);
+	} else {
 		bfree(vaapi);
-
 		return NULL;
 	}
 
-	GstElement *element =
-		gst_bin_get_by_name(GST_BIN(vaapi->pipe), "encoder");
+	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
+	vaapi->appsink = gst_element_factory_make("appsink", NULL);
+	vaapi->pipe = gst_pipeline_new(NULL);
+
+	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapiencoder,
+			 parser, vaapi->appsink, NULL);
+	gst_element_link_many(vaapi->appsrc, vaapiencoder, parser,
+			      vaapi->appsink, NULL);
 
 	for (obs_property_t *property =
 		     obs_properties_first(obs_encoder_properties(encoder));
@@ -75,7 +105,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		switch (obs_property_get_type(property)) {
 		case OBS_PROPERTY_TEXT:
-			g_object_set(element, obs_property_name(property),
+			g_object_set(vaapiencoder, obs_property_name(property),
 				     obs_data_get_string(
 					     settings,
 					     obs_property_name(property)),
@@ -83,20 +113,20 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 			break;
 		case OBS_PROPERTY_INT:
 			g_object_set(
-				element, obs_property_name(property),
+				vaapiencoder, obs_property_name(property),
 				obs_data_get_int(settings,
 						 obs_property_name(property)),
 				NULL);
 			break;
 		case OBS_PROPERTY_BOOL:
 			g_object_set(
-				element, obs_property_name(property),
+				vaapiencoder, obs_property_name(property),
 				obs_data_get_bool(settings,
 						  obs_property_name(property)),
 				NULL);
 			break;
 		case OBS_PROPERTY_FLOAT:
-			g_object_set(element, obs_property_name(property),
+			g_object_set(vaapiencoder, obs_property_name(property),
 				     obs_data_get_double(
 					     settings,
 					     obs_property_name(property)),
@@ -109,11 +139,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		}
 	}
 
-	gst_object_unref(element);
-
-	vaapi->appsrc = gst_bin_get_by_name(GST_BIN(vaapi->pipe), "appsrc");
-	vaapi->appsink = gst_bin_get_by_name(GST_BIN(vaapi->pipe), "appsink");
-
 	GstCaps *caps = gst_caps_new_simple(
 		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",
 		GST_TYPE_FRACTION, 0, 1, "width", G_TYPE_INT,
@@ -122,6 +147,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		G_TYPE_STRING, "progressive", NULL);
 
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
+	gst_caps_unref(caps);
+
+	caps = gst_caps_new_simple("video/x-h264", "stream-format",
+				   G_TYPE_STRING, "byte-stream", "alignment",
+				   G_TYPE_STRING, "au", NULL);
+
+	g_object_set(vaapi->appsink, "caps", caps, NULL);
 	gst_caps_unref(caps);
 
 	GstBus *bus = gst_element_get_bus(vaapi->pipe);
@@ -144,8 +176,6 @@ static void destroy(void *data)
 		gst_bus_remove_watch(bus);
 		gst_object_unref(bus);
 
-		gst_object_unref(vaapi->appsink);
-		gst_object_unref(vaapi->appsrc);
 		gst_object_unref(vaapi->pipe);
 	}
 
@@ -237,13 +267,11 @@ static bool encode(void *data, struct encoder_frame *frame,
 
 static void get_defaults(obs_data_t *settings)
 {
-	GstElementFactory *factory = gst_element_factory_find("vaapih264enc");
-	if (factory == NULL) {
+	GstElement *encoder = gst_element_factory_make("vaapih264enc", NULL);
+	if (encoder == NULL) {
 		blog(LOG_ERROR, "[obs-vaapi] vaapih264enc not found");
 		return;
 	}
-
-	GstElement *encoder = gst_element_factory_create(factory, NULL);
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(
@@ -300,27 +328,23 @@ static void get_defaults(obs_data_t *settings)
 
 	g_free(property_specs);
 	gst_object_unref(encoder);
-	gst_object_unref(factory);
 }
 
 static obs_properties_t *get_properties(void *data)
 {
-	obs_properties_t *properties = obs_properties_create();
-
-	GstElementFactory *factory = gst_element_factory_find("vaapih264enc");
-	if (factory == NULL) {
+	GstElement *encoder = gst_element_factory_make("vaapih264enc", NULL);
+	if (encoder == NULL) {
 		blog(LOG_ERROR, "[obs-vaapi] vaapih264enc not found");
 		return NULL;
 	}
 
-	GstElement *encoder = gst_element_factory_create(factory, NULL);
-
-	obs_property_t *property;
+	obs_properties_t *properties = obs_properties_create();
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(
 		G_OBJECT_GET_CLASS(encoder), &num_properties);
 
 	for (guint i = 0; i < num_properties; i++) {
+		obs_property_t *property;
 		GParamSpec *param = property_specs[i];
 
 		if (param->owner_type == G_TYPE_OBJECT ||
@@ -407,7 +431,6 @@ static obs_properties_t *get_properties(void *data)
 
 	g_free(property_specs);
 	gst_object_unref(encoder);
-	gst_object_unref(factory);
 
 	return properties;
 }
@@ -416,8 +439,9 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 {
 	obs_vaapi_t *vaapi = (obs_vaapi_t *)data;
 
-	if (vaapi->codec_data == NULL)
+	if (vaapi->codec_data == NULL) {
 		return false;
+	}
 
 	*extra_data = vaapi->codec_data;
 	*size = vaapi->codec_data_size;
@@ -448,6 +472,12 @@ bool obs_module_load(void)
 	vaapi.id = "obs-vaapi-h265";
 	vaapi.codec = "hevc";
 	vaapi.type_data = "VAAPI H.265";
+
+	obs_register_encoder(&vaapi);
+
+	vaapi.id = "obs-vaapi-av1";
+	vaapi.codec = "av1";
+	vaapi.type_data = "VAAPI AV1";
 
 	obs_register_encoder(&vaapi);
 

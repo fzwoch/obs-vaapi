@@ -101,7 +101,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	obs_properties_t *properties = obs_encoder_properties(encoder);
 	for (obs_property_t *property = obs_properties_first(properties);
 	     property; obs_property_next(&property)) {
-
 		switch (obs_property_get_type(property)) {
 		case OBS_PROPERTY_TEXT:
 			g_object_set(vaapiencoder, obs_property_name(property),

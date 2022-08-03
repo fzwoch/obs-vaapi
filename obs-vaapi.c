@@ -98,8 +98,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_element_link_many(vaapi->appsrc, vaapiencoder, parser,
 			      vaapi->appsink, NULL);
 
-	for (obs_property_t *property =
-		     obs_properties_first(obs_encoder_properties(encoder));
+	obs_properties_t *properties = obs_encoder_properties(encoder);
+	for (obs_property_t *property = obs_properties_first(properties);
 	     property; obs_property_next(&property)) {
 
 		switch (obs_property_get_type(property)) {
@@ -137,6 +137,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 			break;
 		}
 	}
+	obs_properties_destroy(properties);
 
 	GstCaps *caps = gst_caps_new_simple(
 		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",

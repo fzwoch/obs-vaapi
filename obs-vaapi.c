@@ -72,15 +72,45 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
 
+	vaapi->pipe = gst_pipeline_new(NULL);
+	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
+	vaapi->appsink = gst_element_factory_make("appsink", NULL);
+
+	GstCaps *caps = gst_caps_new_simple(
+		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",
+		GST_TYPE_FRACTION, 0, 1, "width", G_TYPE_INT,
+		obs_encoder_get_width(encoder), "height", G_TYPE_INT,
+		obs_encoder_get_height(encoder), "interlace-mode",
+		G_TYPE_STRING, "progressive", NULL);
+
+	g_object_set(vaapi->appsrc, "caps", caps, NULL);
+	gst_caps_unref(caps);
+
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih264enc", NULL);
 		parser = gst_element_factory_make("h264parse", NULL);
+
+		caps = gst_caps_new_simple("video/x-h264", "stream-format",
+					   G_TYPE_STRING, "byte-stream",
+					   "alignment", G_TYPE_STRING, "au",
+					   NULL);
+
+		g_object_set(vaapi->appsink, "caps", caps, NULL);
+		gst_caps_unref(caps);
 	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "hevc") == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih265enc", NULL);
 		parser = gst_element_factory_make("h265parse", NULL);
+
+		caps = gst_caps_new_simple("video/x-h265", "stream-format",
+					   G_TYPE_STRING, "byte-stream",
+					   "alignment", G_TYPE_STRING, "au",
+					   NULL);
+
+		g_object_set(vaapi->appsink, "caps", caps, NULL);
+		gst_caps_unref(caps);
 	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "av1") == 0) {
 		vaapiencoder = gst_element_factory_make("vaapiav1enc", NULL);
 		parser = gst_element_factory_make("av1parse", NULL);
@@ -88,10 +118,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		bfree(vaapi);
 		return NULL;
 	}
-
-	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
-	vaapi->appsink = gst_element_factory_make("appsink", NULL);
-	vaapi->pipe = gst_pipeline_new(NULL);
 
 	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapiencoder,
 			 parser, vaapi->appsink, NULL);
@@ -137,23 +163,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		}
 	}
 	obs_properties_destroy(properties);
-
-	GstCaps *caps = gst_caps_new_simple(
-		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",
-		GST_TYPE_FRACTION, 0, 1, "width", G_TYPE_INT,
-		obs_encoder_get_width(encoder), "height", G_TYPE_INT,
-		obs_encoder_get_height(encoder), "interlace-mode",
-		G_TYPE_STRING, "progressive", NULL);
-
-	g_object_set(vaapi->appsrc, "caps", caps, NULL);
-	gst_caps_unref(caps);
-
-	caps = gst_caps_new_simple("video/x-h264", "stream-format",
-				   G_TYPE_STRING, "byte-stream", "alignment",
-				   G_TYPE_STRING, "au", NULL);
-
-	g_object_set(vaapi->appsink, "caps", caps, NULL);
-	gst_caps_unref(caps);
 
 	GstBus *bus = gst_element_get_bus(vaapi->pipe);
 	gst_bus_add_watch(bus, bus_callback, NULL);

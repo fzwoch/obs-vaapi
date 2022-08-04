@@ -286,13 +286,21 @@ static void get_defaults(obs_data_t *settings)
 			obs_data_set_default_string(settings, param->name, str);
 			break;
 		case G_TYPE_UINT64:
+			gint uint64;
+			g_object_get(encoder, param->name, &uint64, NULL);
+			obs_data_set_default_int(settings, param->name, uint64);
 		case G_TYPE_INT64:
+			gint int64;
+			g_object_get(encoder, param->name, &int64, NULL);
+			obs_data_set_default_int(settings, param->name, int64);
 		case G_TYPE_UINT:
+			gint uint32;
+			g_object_get(encoder, param->name, &uint32, NULL);
+			obs_data_set_default_int(settings, param->name, uint32);
 		case G_TYPE_INT:
-			gint integer;
-			g_object_get(encoder, param->name, &integer, NULL);
-			obs_data_set_default_int(settings, param->name,
-						 integer);
+			gint int32;
+			g_object_get(encoder, param->name, &int32, NULL);
+			obs_data_set_default_int(settings, param->name, int32);
 			break;
 		case G_TYPE_BOOLEAN:
 			gboolean boolean;
@@ -301,10 +309,16 @@ static void get_defaults(obs_data_t *settings)
 						  boolean);
 			break;
 		case G_TYPE_FLOAT:
+			gfloat float32;
+			g_object_get(encoder, param->name, &float32, NULL);
+			obs_data_set_default_double(settings, param->name,
+						    float32);
+			break;
 		case G_TYPE_DOUBLE:
-			gdouble fp;
-			g_object_get(encoder, param->name, &fp, NULL);
-			obs_data_set_default_double(settings, param->name, fp);
+			gdouble float64;
+			g_object_get(encoder, param->name, &float64, NULL);
+			obs_data_set_default_double(settings, param->name,
+						    float64);
 			break;
 		default:
 			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",

@@ -458,7 +458,7 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 	return true;
 }
 
-bool obs_module_load(void)
+MODULE_EXPORT bool obs_module_load(void)
 {
 	gst_init(NULL, NULL);
 

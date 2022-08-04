@@ -154,6 +154,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 					     obs_property_name(property)),
 				     NULL);
 			break;
+		case OBS_PROPERTY_LIST:
+			g_object_set(vaapiencoder, obs_property_name(property),
+				     obs_data_get_string(
+					     settings,
+					     obs_property_name(property)),
+				     NULL);
+			break;
 		default:
 			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
 			     obs_property_name(property));
@@ -328,8 +335,26 @@ static void get_defaults(obs_data_t *settings)
 						    float64);
 			break;
 		default:
-			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
-			     param->name);
+			if (G_IS_PARAM_SPEC_ENUM(param)) {
+				GEnumValue *values =
+					G_ENUM_CLASS(g_type_class_ref(
+							     param->value_type))
+						->values;
+				gint enum_value = g_value_get_enum(&value);
+				int j = 0;
+				while (values[j].value_name) {
+					if (values[j].value == enum_value) {
+						obs_data_set_default_string(
+							settings, param->name,
+							values[j].value_name);
+						break;
+					}
+				}
+			} else {
+				blog(LOG_WARNING,
+				     "[obs-vaapi] unhandled property: %s",
+				     param->name);
+			}
 		}
 	}
 
@@ -431,8 +456,30 @@ static obs_properties_t *get_properties(void *data)
 				property, g_param_spec_get_blurb(param));
 			break;
 		default:
-			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
-			     param->name);
+			if (G_IS_PARAM_SPEC_ENUM(param)) {
+				property = obs_properties_add_list(
+					properties, param->name, param->name,
+					OBS_COMBO_TYPE_LIST,
+					OBS_COMBO_FORMAT_STRING);
+				GEnumValue *values =
+					G_ENUM_CLASS(g_type_class_ref(
+							     param->value_type))
+						->values;
+				int j = 0;
+				while (values[j].value_name) {
+					obs_property_list_add_string(
+						property, values[j].value_name,
+						values[j].value_nick);
+					j++;
+				}
+				obs_property_set_long_description(
+					property,
+					g_param_spec_get_blurb(param));
+			} else {
+				blog(LOG_WARNING,
+				     "[obs-vaapi] unhandled property: %s",
+				     param->name);
+			}
 		}
 	}
 

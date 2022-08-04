@@ -22,6 +22,9 @@
 #include <gst/gst.h>
 #include <gst/app/app.h>
 
+#define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
+#define ENCODER_TYPE_DATA_H265 "VAAPI H.265"
+
 OBS_DECLARE_MODULE()
 
 typedef struct {
@@ -268,11 +271,22 @@ static bool encode(void *data, struct encoder_frame *frame,
 	return true;
 }
 
-static void get_defaults(obs_data_t *settings)
+static void get_defaults2(obs_data_t *settings, void *type_data)
 {
-	GstElement *encoder = gst_element_factory_make("vaapih264enc", NULL);
+	GstElement *encoder;
+
+	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
+		encoder = gst_element_factory_make("vaapih264enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265) == 0) {
+		encoder = gst_element_factory_make("vaapih265enc", NULL);
+	} else {
+		blog(LOG_ERROR, "[obs-vaapi] unhandled encoder type");
+		return;
+	}
+
 	if (encoder == NULL) {
-		blog(LOG_ERROR, "[obs-vaapi] vaapih264enc not found");
+		blog(LOG_ERROR, "[obs-vaapi] could not load encoder: %s",
+		     (const char *)type_data);
 		return;
 	}
 
@@ -368,11 +382,22 @@ static void get_defaults(obs_data_t *settings)
 	gst_object_unref(encoder);
 }
 
-static obs_properties_t *get_properties(void *data)
+static obs_properties_t *get_properties2(void *data, void *type_data)
 {
-	GstElement *encoder = gst_element_factory_make("vaapih264enc", NULL);
+	GstElement *encoder;
+
+	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
+		encoder = gst_element_factory_make("vaapih264enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265) == 0) {
+		encoder = gst_element_factory_make("vaapih265enc", NULL);
+	} else {
+		blog(LOG_ERROR, "[obs-vaapi] unhandled encoder type");
+		return NULL;
+	}
+
 	if (encoder == NULL) {
-		blog(LOG_ERROR, "[obs-vaapi] vaapih264enc not found");
+		blog(LOG_ERROR, "[obs-vaapi] could not load encoder: %s",
+		     (const char *)type_data);
 		return NULL;
 	}
 
@@ -526,18 +551,18 @@ MODULE_EXPORT bool obs_module_load(void)
 		.get_name = get_name,
 		.create = create,
 		.destroy = destroy,
-		.get_defaults = get_defaults,
-		.get_properties = get_properties,
+		.get_defaults2 = get_defaults2,
+		.get_properties2 = get_properties2,
 		.encode = encode,
 		.get_extra_data = get_extra_data,
-		.type_data = "VAAPI H.264",
+		.type_data = ENCODER_TYPE_DATA_H264,
 	};
 
 	obs_register_encoder(&vaapi);
 
 	vaapi.id = "obs-vaapi-h265";
 	vaapi.codec = "hevc";
-	vaapi.type_data = "VAAPI H.265";
+	vaapi.type_data = ENCODER_TYPE_DATA_H265;
 
 	obs_register_encoder(&vaapi);
 

@@ -71,15 +71,18 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
 
+	struct obs_video_info video_info;
+	obs_get_video_info(&video_info);
+
 	vaapi->pipe = gst_pipeline_new(NULL);
 	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
 	vaapi->appsink = gst_element_factory_make("appsink", NULL);
 
 	GstCaps *caps = gst_caps_new_simple(
 		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",
-		GST_TYPE_FRACTION, 0, 1, "width", G_TYPE_INT,
-		obs_encoder_get_width(encoder), "height", G_TYPE_INT,
-		obs_encoder_get_height(encoder), "interlace-mode",
+		GST_TYPE_FRACTION, video_info.fps_num, video_info.fps_den,
+		"width", G_TYPE_INT, obs_encoder_get_width(encoder), "height",
+		G_TYPE_INT, obs_encoder_get_height(encoder), "interlace-mode",
 		G_TYPE_STRING, "progressive", NULL);
 
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
@@ -408,7 +411,9 @@ static obs_properties_t *get_properties(void *data)
 			property = obs_properties_add_int(
 				properties, param->name, param->name,
 				G_PARAM_SPEC_UINT64(param)->minimum,
-				G_PARAM_SPEC_UINT64(param)->maximum, 1);
+				MIN(G_PARAM_SPEC_UINT64(param)->maximum,
+				    G_MAXINT32),
+				1);
 			obs_property_set_long_description(
 				property, g_param_spec_get_blurb(param));
 			break;
@@ -416,7 +421,9 @@ static obs_properties_t *get_properties(void *data)
 			property = obs_properties_add_int(
 				properties, param->name, param->name,
 				G_PARAM_SPEC_INT64(param)->minimum,
-				G_PARAM_SPEC_INT64(param)->maximum, 1);
+				MIN(G_PARAM_SPEC_INT64(param)->maximum,
+				    G_MAXINT32),
+				1);
 			obs_property_set_long_description(
 				property, g_param_spec_get_blurb(param));
 			break;
@@ -424,7 +431,9 @@ static obs_properties_t *get_properties(void *data)
 			property = obs_properties_add_int(
 				properties, param->name, param->name,
 				G_PARAM_SPEC_UINT(param)->minimum,
-				G_PARAM_SPEC_UINT(param)->maximum, 1);
+				MIN(G_PARAM_SPEC_UINT(param)->maximum,
+				    G_MAXINT32),
+				1);
 			obs_property_set_long_description(
 				property, g_param_spec_get_blurb(param));
 			break;

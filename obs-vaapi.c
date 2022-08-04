@@ -155,11 +155,11 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 				     NULL);
 			break;
 		case OBS_PROPERTY_LIST:
-			g_object_set(vaapiencoder, obs_property_name(property),
-				     obs_data_get_string(
-					     settings,
-					     obs_property_name(property)),
-				     NULL);
+			gst_util_set_object_arg(
+				G_OBJECT(vaapiencoder),
+				obs_property_name(property),
+				obs_data_get_string(
+					settings, obs_property_name(property)));
 			break;
 		default:
 			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
@@ -303,14 +303,17 @@ static void get_defaults(obs_data_t *settings)
 			gint uint64;
 			g_object_get(encoder, param->name, &uint64, NULL);
 			obs_data_set_default_int(settings, param->name, uint64);
+			break;
 		case G_TYPE_INT64:
 			gint int64;
 			g_object_get(encoder, param->name, &int64, NULL);
 			obs_data_set_default_int(settings, param->name, int64);
+			break;
 		case G_TYPE_UINT:
 			gint uint32;
 			g_object_get(encoder, param->name, &uint32, NULL);
 			obs_data_set_default_int(settings, param->name, uint32);
+			break;
 		case G_TYPE_INT:
 			gint int32;
 			g_object_get(encoder, param->name, &int32, NULL);

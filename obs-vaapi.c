@@ -1,4 +1,3 @@
-
 /*
  * obs-vaapi. OBS Studio plugin.
  * Copyright (C) 2022 Florian Zwoch <fzwoch@gmail.com>
@@ -111,10 +110,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		g_object_set(vaapi->appsink, "caps", caps, NULL);
 		gst_caps_unref(caps);
-	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "av1") == 0) {
-		vaapiencoder = gst_element_factory_make("vaapiav1enc", NULL);
-		parser = gst_element_factory_make("av1parse", NULL);
 	} else {
+		blog(LOG_ERROR, "[obs-vaapi] unhandled codec: %s",
+		     obs_encoder_get_codec(encoder));
 		bfree(vaapi);
 		return NULL;
 	}
@@ -476,34 +474,13 @@ MODULE_EXPORT bool obs_module_load(void)
 		.type_data = "VAAPI H.264",
 	};
 
-	GstElementFactory *factory = gst_element_factory_find("vaapih264enc");
-	if (factory) {
-		gst_object_unref(factory);
-		blog(LOG_INFO, "[obs-vaapi] found H.264 support");
-		obs_register_encoder(&vaapi);
-	}
+	obs_register_encoder(&vaapi);
 
 	vaapi.id = "obs-vaapi-h265";
 	vaapi.codec = "hevc";
 	vaapi.type_data = "VAAPI H.265";
 
-	factory = gst_element_factory_find("vaapih265enc");
-	if (factory) {
-		gst_object_unref(factory);
-		blog(LOG_INFO, "[obs-vaapi] found H.265 support");
-		obs_register_encoder(&vaapi);
-	}
-
-	vaapi.id = "obs-vaapi-av1";
-	vaapi.codec = "av1";
-	vaapi.type_data = "VAAPI AV1";
-
-	factory = gst_element_factory_find("vaapiav1enc");
-	if (factory) {
-		gst_object_unref(factory);
-		blog(LOG_INFO, "[obs-vaapi] found AV1 support");
-		obs_register_encoder(&vaapi);
-	}
+	obs_register_encoder(&vaapi);
 
 	return true;
 }

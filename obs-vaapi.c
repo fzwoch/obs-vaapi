@@ -322,46 +322,48 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 
 		g_object_get_property(G_OBJECT(encoder), param->name, &value);
 
+		gchar *str;
+		gint uint64;
+		gint int64;
+		gint uint32;
+		gint int32;
+		gboolean boolean;
+		gfloat float32;
+		gdouble float64;
+		int j;
+
 		switch (G_VALUE_TYPE(&value)) {
 		case G_TYPE_STRING:
-			gchar *str;
 			g_object_get(encoder, param->name, &str, NULL);
 			obs_data_set_default_string(settings, param->name, str);
 			break;
 		case G_TYPE_UINT64:
-			gint uint64;
 			g_object_get(encoder, param->name, &uint64, NULL);
 			obs_data_set_default_int(settings, param->name, uint64);
 			break;
 		case G_TYPE_INT64:
-			gint int64;
 			g_object_get(encoder, param->name, &int64, NULL);
 			obs_data_set_default_int(settings, param->name, int64);
 			break;
 		case G_TYPE_UINT:
-			gint uint32;
 			g_object_get(encoder, param->name, &uint32, NULL);
 			obs_data_set_default_int(settings, param->name, uint32);
 			break;
 		case G_TYPE_INT:
-			gint int32;
 			g_object_get(encoder, param->name, &int32, NULL);
 			obs_data_set_default_int(settings, param->name, int32);
 			break;
 		case G_TYPE_BOOLEAN:
-			gboolean boolean;
 			g_object_get(encoder, param->name, &boolean, NULL);
 			obs_data_set_default_bool(settings, param->name,
 						  boolean);
 			break;
 		case G_TYPE_FLOAT:
-			gfloat float32;
 			g_object_get(encoder, param->name, &float32, NULL);
 			obs_data_set_default_double(settings, param->name,
 						    float32);
 			break;
 		case G_TYPE_DOUBLE:
-			gdouble float64;
 			g_object_get(encoder, param->name, &float64, NULL);
 			obs_data_set_default_double(settings, param->name,
 						    float64);
@@ -373,7 +375,7 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 							     param->value_type))
 						->values;
 				gint enum_value = g_value_get_enum(&value);
-				int j = 0;
+				j = 0;
 				while (values[j].value_name) {
 					if (values[j].value == enum_value) {
 						obs_data_set_default_string(

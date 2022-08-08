@@ -18,7 +18,7 @@
  * along with obs-vaapi. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <obs/obs-module.h>
+#include <obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
 

@@ -330,7 +330,6 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 		gboolean boolean;
 		gfloat float32;
 		gdouble float64;
-		int j;
 
 		switch (G_VALUE_TYPE(&value)) {
 		case G_TYPE_STRING:
@@ -375,8 +374,7 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 							     param->value_type))
 						->values;
 				gint enum_value = g_value_get_enum(&value);
-				j = 0;
-				while (values[j].value_name) {
+				for (int j = 0; values[j].value_name; j++) {
 					if (values[j].value == enum_value) {
 						obs_data_set_default_string(
 							settings, param->name,

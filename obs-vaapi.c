@@ -61,6 +61,11 @@ static gboolean bus_callback(GstBus *bus, GstMessage *message,
 	return TRUE;
 }
 
+static void enough_data()
+{
+	blog(LOG_WARNING, "[obs-vaapi] encoder overload");
+}
+
 static const char *get_name(void *type_data)
 {
 	return (const char *)type_data;
@@ -93,6 +98,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
+
+	g_object_set(vaapi->appsrc, "max-buffers", 1, "max-size-bytes", 0,
+		     "max-size-time", 0, NULL);
+	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
+
+	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
+			 NULL);
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih264enc", NULL);

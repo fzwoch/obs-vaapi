@@ -23,7 +23,7 @@ project('obs-vaapi', 'c')
 library('obs-vaapi',
 	'obs-vaapi.c',
 	dependencies : [
-		dependency('libobs', required : false),
+		dependency('libobs', required : get_option('gstreamer')),
 		dependency('gstreamer-1.0'),
 		dependency('gstreamer-app-1.0'),
 	],

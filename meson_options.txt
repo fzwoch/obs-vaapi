@@ -1,1 +1,1 @@
-option('gstreamer', type : 'feature', value : 'enabled')
+option('libobs', type : 'feature', value : 'enabled')

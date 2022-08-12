@@ -382,6 +382,8 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 						break;
 					}
 				}
+			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
+				// not implemented
 			} else {
 				blog(LOG_WARNING,
 				     "[obs-vaapi] unhandled property: %s",

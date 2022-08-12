@@ -525,6 +525,8 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 				obs_property_set_long_description(
 					property,
 					g_param_spec_get_blurb(param));
+			} else if (GST_PARAM_SPEC_ARRAY_LIST(param)) {
+				// not implemented
 			} else {
 				blog(LOG_WARNING,
 				     "[obs-vaapi] unhandled property: %s",
@@ -548,6 +550,9 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 		return false;
 	}
 
+	// We return the first AU. It includes required data. But it also
+	// includes the first frame. We hope that downstream has a parser to
+	// pick the relevant data it wants.
 	*extra_data = vaapi->codec_data;
 	*size = vaapi->codec_size;
 

@@ -515,12 +515,10 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 					G_ENUM_CLASS(g_type_class_ref(
 							     param->value_type))
 						->values;
-				int j = 0;
-				while (values[j].value_name) {
+				for (int j = 0; values[j].value_name; j++) {
 					obs_property_list_add_string(
 						property, values[j].value_name,
 						values[j].value_nick);
-					j++;
 				}
 				obs_property_set_long_description(
 					property,

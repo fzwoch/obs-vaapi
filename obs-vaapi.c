@@ -387,6 +387,7 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 				     "[obs-vaapi] unhandled property: %s",
 				     param->name);
 			}
+			break;
 		}
 	}
 
@@ -529,6 +530,7 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 				     "[obs-vaapi] unhandled property: %s",
 				     param->name);
 			}
+			break;
 		}
 	}
 

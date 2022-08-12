@@ -2,11 +2,12 @@ build:
   stage: build
   image: obs-vaapi
   script:
-    - meson x86_64 -Dlibobs=disabled -Dc_args=-I/obs/libobs -Dc_link_args=-Wl,--unresolved-symbols=ignore-all
+    - meson x86_64 -Dlibobs=disabled -Dc_args=-I/obs/libobs -Dc_link_args="-Wl,--unresolved-symbols=ignore-all -static-libgcc"
     - ninja -C x86_64
 
     - echo "[binaries]" > arm64.txt
     - echo "c = 'aarch64-linux-gnu-gcc'" >> arm64.txt
+    - echo "strip = 'aarch64-linux-gnu-strip'" >> arm64.txt
     - echo "pkgconfig = 'aarch64-linux-gnu-pkg-config'" >> arm64.txt
     - echo "" >> arm64.txt
     - echo "[host_machine]" >> arm64.txt
@@ -15,7 +16,7 @@ build:
     - echo "cpu = 'aarch64'" >> arm64.txt
     - echo "endian = 'little'" >> arm64.txt
 
-    - meson aarch64 --cross-file=arm64.txt -Dlibobs=disabled -Dc_args=-I/obs/libobs -Dc_link_args=-Wl,--unresolved-symbols=ignore-all
+    - meson aarch64 --cross-file=arm64.txt -Dlibobs=disabled -Dc_args=-I/obs/libobs -Dc_link_args="-Wl,--unresolved-symbols=ignore-all -static-libgcc"
     - ninja -C aarch64
   artifacts:
     name: obs-vaapi

@@ -525,7 +525,7 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 				obs_property_set_long_description(
 					property,
 					g_param_spec_get_blurb(param));
-			} else if (GST_PARAM_SPEC_ARRAY_LIST(param)) {
+			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
 				// not implemented
 			} else {
 				blog(LOG_WARNING,

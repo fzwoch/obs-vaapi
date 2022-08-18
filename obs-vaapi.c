@@ -79,8 +79,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	vaapi->encoder = encoder;
 
-	obs_encoder_set_preferred_video_format(encoder, VIDEO_FORMAT_NV12);
-
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
 
@@ -89,11 +87,33 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	vaapi->appsink = gst_element_factory_make("appsink", NULL);
 
 	GstCaps *caps = gst_caps_new_simple(
-		"video/x-raw", "format", G_TYPE_STRING, "NV12", "framerate",
-		GST_TYPE_FRACTION, video_info.fps_num, video_info.fps_den,
-		"width", G_TYPE_INT, obs_encoder_get_width(encoder), "height",
-		G_TYPE_INT, obs_encoder_get_height(encoder), "interlace-mode",
+		"video/x-raw", "framerate", GST_TYPE_FRACTION,
+		video_info.fps_num, video_info.fps_den, "width", G_TYPE_INT,
+		obs_encoder_get_width(encoder), "height", G_TYPE_INT,
+		obs_encoder_get_height(encoder), "interlace-mode",
 		G_TYPE_STRING, "progressive", NULL);
+
+	switch (video_info.output_format) {
+
+	case VIDEO_FORMAT_I420:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
+				    NULL);
+		break;
+	case VIDEO_FORMAT_I010:
+		obs_encoder_set_preferred_video_format(encoder,
+						       VIDEO_FORMAT_P010);
+	case VIDEO_FORMAT_P010:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
+				    NULL);
+		break;
+	default:
+		obs_encoder_set_preferred_video_format(encoder,
+						       VIDEO_FORMAT_NV12);
+	case VIDEO_FORMAT_NV12:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
+				    NULL);
+		break;
+	}
 
 	switch (video_info.colorspace) {
 	case VIDEO_CS_601:

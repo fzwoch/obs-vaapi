@@ -99,8 +99,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
-	g_object_set(vaapi->appsrc, "max-buffers", 1, "max-size-bytes", 0,
-		     "max-size-time", 0, NULL);
+	g_object_set(vaapi->appsrc, "max-buffers", 1, "max-bytes", 0,
+		     "max-time", 0, NULL);
 	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
 
 	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),

@@ -95,6 +95,30 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		G_TYPE_INT, obs_encoder_get_height(encoder), "interlace-mode",
 		G_TYPE_STRING, "progressive", NULL);
 
+	switch (video_info.colorspace) {
+	case VIDEO_CS_601:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt601",
+				    NULL);
+		break;
+	case VIDEO_CS_SRGB:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "srgb",
+				    NULL);
+		break;
+	case VIDEO_CS_2100_PQ:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
+				    "bt2100_pq", NULL);
+		break;
+	case VIDEO_CS_2100_HLG:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
+				    "bt2100_hlg", NULL);
+		break;
+	case VIDEO_CS_709:
+	default:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt709",
+				    NULL);
+		break;
+	}
+
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
 	gst_caps_unref(caps);
 

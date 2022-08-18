@@ -36,6 +36,8 @@ typedef struct {
 	GstMapInfo info;
 	void *codec_data;
 	size_t codec_size;
+	GMutex mutex;
+	GCond cond;
 } obs_vaapi_t;
 
 static gboolean bus_callback(GstBus *bus, GstMessage *message,
@@ -134,6 +136,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		return NULL;
 	}
 
+	if (vaapiencoder == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] could not load encoder: %s",
+		     obs_encoder_get_codec(encoder));
+		bfree(vaapi);
+		return NULL;
+	}
+
 	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapiencoder,
 			 parser, vaapi->appsink, NULL);
 	gst_element_link_many(vaapi->appsrc, vaapiencoder, parser,
@@ -192,6 +201,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 
+	g_mutex_init(&vaapi->mutex);
+	g_cond_init(&vaapi->cond);
+
 	return vaapi;
 }
 
@@ -215,8 +227,20 @@ static void destroy(void *data)
 		gst_sample_unref(vaapi->sample);
 	}
 
+	g_mutex_clear(&vaapi->mutex);
+	g_cond_clear(&vaapi->cond);
+
 	bfree(vaapi->codec_data);
 	bfree(vaapi);
+}
+
+static void destroy_notify(void *data)
+{
+	obs_vaapi_t *vaapi = (obs_vaapi_t *)data;
+
+	g_mutex_lock(&vaapi->mutex);
+	g_cond_signal(&vaapi->cond);
+	g_mutex_unlock(&vaapi->mutex);
 }
 
 static bool encode(void *data, struct encoder_frame *frame,
@@ -238,13 +262,18 @@ static bool encode(void *data, struct encoder_frame *frame,
 		0,
 		obs_encoder_get_width(vaapi->encoder) *
 			obs_encoder_get_width(vaapi->encoder) * 3 / 2,
-		NULL, NULL);
+		vaapi, destroy_notify);
 
 	GST_BUFFER_PTS(buffer) =
 		frame->pts *
 		(GST_SECOND / (packet->timebase_den / packet->timebase_num));
 
+	g_mutex_lock(&vaapi->mutex);
+
 	gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
+
+	g_cond_wait(&vaapi->cond, &vaapi->mutex);
+	g_mutex_unlock(&vaapi->mutex);
 
 	vaapi->sample =
 		gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);

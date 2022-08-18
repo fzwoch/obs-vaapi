@@ -131,15 +131,13 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	} else {
 		blog(LOG_ERROR, "[obs-vaapi] unhandled codec: %s",
 		     obs_encoder_get_codec(encoder));
-		bfree(vaapi);
-		return NULL;
+		goto bail;
 	}
 
 	if (vaapiencoder == NULL) {
 		blog(LOG_ERROR, "[obs-vaapi] could not load encoder: %s",
 		     obs_encoder_get_codec(encoder));
-		bfree(vaapi);
-		return NULL;
+		goto bail;
 	}
 
 	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapiencoder,
@@ -204,6 +202,27 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	g_cond_init(&vaapi->cond);
 
 	return vaapi;
+
+bail:
+	if (vaapi->pipe) {
+		gst_object_unref(vaapi->pipe);
+	}
+	if (vaapi->appsrc) {
+		gst_object_unref(vaapi->appsrc);
+	}
+	if (vaapi->appsink) {
+		gst_object_unref(vaapi->appsink);
+	}
+	if (vaapiencoder) {
+		gst_object_unref(vaapiencoder);
+	}
+	if (parser) {
+		gst_object_unref(parser);
+	}
+
+	bfree(vaapi);
+
+	return NULL;
 }
 
 static void destroy(void *data)

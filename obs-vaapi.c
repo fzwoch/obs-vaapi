@@ -94,7 +94,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		G_TYPE_STRING, "progressive", NULL);
 
 	switch (video_info.output_format) {
-
 	case VIDEO_FORMAT_I420:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
 				    NULL);

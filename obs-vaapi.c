@@ -101,7 +101,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
-	g_object_set(vaapi->appsrc, "block", TRUE, NULL);
 	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
 
 	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
@@ -258,10 +257,10 @@ static bool encode(void *data, struct encoder_frame *frame,
 	GstBuffer *buffer = gst_buffer_new_wrapped_full(
 		0, frame->data[0],
 		obs_encoder_get_width(vaapi->encoder) *
-			obs_encoder_get_width(vaapi->encoder) * 3 / 2,
+			obs_encoder_get_height(vaapi->encoder) * 3 / 2,
 		0,
 		obs_encoder_get_width(vaapi->encoder) *
-			obs_encoder_get_width(vaapi->encoder) * 3 / 2,
+			obs_encoder_get_height(vaapi->encoder) * 3 / 2,
 		vaapi, destroy_notify);
 
 	GST_BUFFER_PTS(buffer) =

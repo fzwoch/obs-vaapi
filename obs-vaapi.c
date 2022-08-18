@@ -34,10 +34,10 @@ typedef struct {
 	GstElement *appsink;
 	GstSample *sample;
 	GstMapInfo info;
-	void *codec_data;
-	size_t codec_size;
 	GMutex mutex;
 	GCond cond;
+	void *codec_data;
+	size_t codec_size;
 } obs_vaapi_t;
 
 static gboolean bus_callback(GstBus *bus, GstMessage *message,

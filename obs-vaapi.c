@@ -63,6 +63,10 @@ static gboolean bus_callback(GstBus *bus, GstMessage *message,
 	return TRUE;
 }
 
+// Should never trigger as we block the encode function
+// until the current buffer has been consumed. If we
+// block for too long it should be reported as encoder
+// overload in OBS.
 static void enough_data()
 {
 	blog(LOG_WARNING, "[obs-vaapi] encoder overload");
@@ -98,13 +102,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
 				    NULL);
 		break;
-	case VIDEO_FORMAT_I010:
-		obs_encoder_set_preferred_video_format(encoder,
-						       VIDEO_FORMAT_P010);
-	case VIDEO_FORMAT_P010:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
-				    NULL);
-		break;
 	default:
 		obs_encoder_set_preferred_video_format(encoder,
 						       VIDEO_FORMAT_NV12);
@@ -112,11 +109,23 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
 		break;
+	case VIDEO_FORMAT_I010:
+		obs_encoder_set_preferred_video_format(encoder,
+						       VIDEO_FORMAT_P010);
+	case VIDEO_FORMAT_P010:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
+				    NULL);
+		break;
 	}
 
 	switch (video_info.colorspace) {
 	case VIDEO_CS_601:
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt601",
+				    NULL);
+		break;
+	default:
+	case VIDEO_CS_709:
+		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt709",
 				    NULL);
 		break;
 	case VIDEO_CS_SRGB:
@@ -130,11 +139,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	case VIDEO_CS_2100_HLG:
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_hlg", NULL);
-		break;
-	case VIDEO_CS_709:
-	default:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt709",
-				    NULL);
 		break;
 	}
 

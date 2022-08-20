@@ -320,14 +320,23 @@ static bool encode(void *data, struct encoder_frame *frame,
 		vaapi->sample = NULL;
 	}
 
-	GstBuffer *buffer = gst_buffer_new_wrapped_full(
-		0, frame->data[0],
-		obs_encoder_get_width(vaapi->encoder) *
-			obs_encoder_get_height(vaapi->encoder) * 3 / 2,
-		0,
-		obs_encoder_get_width(vaapi->encoder) *
-			obs_encoder_get_height(vaapi->encoder) * 3 / 2,
-		vaapi, destroy_notify);
+	struct obs_video_info video_info;
+	obs_get_video_info(&video_info);
+
+	gsize buffer_size;
+
+	if (video_info.output_format == VIDEO_FORMAT_I010 ||
+	    video_info.output_format == VIDEO_FORMAT_P010) {
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3;
+	} else {
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3 / 2;
+	}
+
+	GstBuffer *buffer =
+		gst_buffer_new_wrapped_full(0, frame->data[0], buffer_size, 0,
+					    buffer_size, vaapi, destroy_notify);
 
 	GST_BUFFER_PTS(buffer) =
 		frame->pts *

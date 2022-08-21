@@ -538,7 +538,7 @@ static void populate_devices(obs_property_t *prop)
 		}
 
 		pci_fill_info(pci_dev, PCI_FILL_IDENT);
-		pci_lookup_name(pci, device, 1024, PCI_LOOKUP_DEVICE,
+		pci_lookup_name(pci, device, sizeof(device), PCI_LOOKUP_DEVICE,
 				pci_dev->vendor_id, pci_dev->device_id);
 		pci_free_dev(pci_dev);
 

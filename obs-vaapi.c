@@ -18,6 +18,8 @@
  * along with obs-vaapi. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#define _GNU_SOURCE
+
 #include <obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
@@ -82,6 +84,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	obs_vaapi_t *vaapi = bzalloc(sizeof(obs_vaapi_t));
 
 	vaapi->encoder = encoder;
+
+	g_setenv("GST_VAAPI_DRM_DEVICE",
+		 obs_data_get_string(settings, "device"), TRUE);
 
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
@@ -404,6 +409,8 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 		return;
 	}
 
+	obs_data_set_default_string(settings, "device", "");
+
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(
 		G_OBJECT_GET_CLASS(encoder), &num_properties);
@@ -499,6 +506,32 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	gst_object_unref(encoder);
 }
 
+static int scanfilter(const struct dirent *entry)
+{
+	return !g_ascii_strncasecmp(entry->d_name, "renderD", 7);
+}
+
+static void populate_devices(obs_property_t *prop)
+{
+	struct dirent **list;
+	int n = scandir("/dev/dri", &list, scanfilter, versionsort);
+
+	obs_property_list_add_string(prop, "Default", "");
+
+	for (int i = 0; i < n; i++) {
+		char device[64] = {0};
+		int w = g_snprintf(device, sizeof(device), "/dev/dri/%s",
+				   list[i]->d_name);
+		(void)w;
+		obs_property_list_add_string(prop, device, device);
+	}
+
+	while (n--) {
+		free(list[n]);
+	}
+	free(list);
+}
+
 static obs_properties_t *get_properties2(void *data, void *type_data)
 {
 	GstElement *encoder;
@@ -519,12 +552,21 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 	}
 
 	obs_properties_t *properties = obs_properties_create();
+
+	obs_property_t *property = obs_properties_add_list(
+		properties, "device", "device", OBS_COMBO_TYPE_LIST,
+		OBS_COMBO_FORMAT_STRING);
+
+	populate_devices(property);
+
+	obs_property_set_long_description(property,
+					  "Specify DRM device to use");
+
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(
 		G_OBJECT_GET_CLASS(encoder), &num_properties);
 
 	for (guint i = 0; i < num_properties; i++) {
-		obs_property_t *property;
 		GParamSpec *param = property_specs[i];
 
 		if (param->owner_type == G_TYPE_OBJECT ||

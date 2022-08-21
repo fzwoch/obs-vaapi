@@ -66,10 +66,6 @@ static gboolean bus_callback(GstBus *bus, GstMessage *message,
 	return TRUE;
 }
 
-// Should never trigger as we block the encode function
-// until the current buffer has been consumed. If we
-// block for too long it should be reported as encoder
-// overload in OBS.
 static void enough_data()
 {
 	blog(LOG_WARNING, "[obs-vaapi] encoder overload");
@@ -156,6 +152,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
 
+	// Should never trigger as we block the encode function
+	// until the current buffer has been consumed. If we
+	// block for too long it should be reported as encoder
+	// overload in OBS.
 	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
 			 NULL);
 

@@ -20,7 +20,7 @@
 
 build:
   stage: build
-  image: obs-vaapi
+  image: registry.gitlab.com/fzwoch/obs-vaapi
   script:
     - meson x86_64 -Dlibobs=disabled -Dc_args=-I/obs/libobs -Dc_link_args="-Wl,--unresolved-symbols=ignore-all -static-libgcc"
     - ninja -C x86_64

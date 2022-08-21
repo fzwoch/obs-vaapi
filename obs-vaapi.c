@@ -724,8 +724,17 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 	return true;
 }
 
+extern const char *obs_vaapi_version;
+
 MODULE_EXPORT bool obs_module_load(void)
 {
+	guint major, minor, micro, nano;
+
+	gst_version(&major, &minor, &micro, &nano);
+
+	blog(LOG_INFO, "[obs-vaapi] build: %s, gst-runtime: %u.%u.%u",
+	     obs_vaapi_version, major, minor, micro);
+
 	gst_init(NULL, NULL);
 
 	struct obs_encoder_info vaapi = {

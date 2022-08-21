@@ -1,0 +1,1 @@
+const char *obs_vaapi_version = "@VCS_TAG@";

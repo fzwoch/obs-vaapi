@@ -22,6 +22,11 @@ project('obs-vaapi', 'c')
 
 library('obs-vaapi',
 	'obs-vaapi.c',
+	vcs_tag(
+		command : ['git', 'rev-parse', '--short', 'HEAD'],
+		input : 'version.c.in',
+		output : 'version.c',
+	),
 	dependencies : [
 		dependency('libobs', required : get_option('libobs')),
 		dependency('gstreamer-1.0'),

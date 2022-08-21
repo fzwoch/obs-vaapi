@@ -23,6 +23,7 @@
 #include <obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
+#include <pci/pci.h>
 
 #define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
 #define ENCODER_TYPE_DATA_H265 "VAAPI H.265"
@@ -508,23 +509,43 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 
 static int scanfilter(const struct dirent *entry)
 {
-	return !g_ascii_strncasecmp(entry->d_name, "renderD", 7);
+	return g_str_has_suffix(entry->d_name, "-render");
 }
 
 static void populate_devices(obs_property_t *prop)
 {
 	struct dirent **list;
-	int n = scandir("/dev/dri", &list, scanfilter, versionsort);
+	int n = scandir("/dev/dri/by-path/", &list, scanfilter, versionsort);
 
 	obs_property_list_add_string(prop, "Default", "");
 
+	struct pci_access *pci = pci_alloc();
+	pci_init(pci);
+
 	for (int i = 0; i < n; i++) {
-		char device[64] = {0};
-		int w = g_snprintf(device, sizeof(device), "/dev/dri/%s",
-				   list[i]->d_name);
-		(void)w;
-		obs_property_list_add_string(prop, device, device);
+		char device[1024] = {};
+		int domain, bus, dev, fun;
+
+		sscanf(list[i]->d_name, "%*[^-]%x:%x:%x.%x%*s", &domain, &bus,
+		       &dev, &fun);
+
+		struct pci_dev *pci_dev =
+			pci_get_dev(pci, domain, bus, dev, fun);
+		if (pci_dev == NULL) {
+			obs_property_list_add_string(prop, list[i]->d_name,
+						     list[i]->d_name);
+			continue;
+		}
+
+		pci_fill_info(pci_dev, PCI_FILL_IDENT);
+		pci_lookup_name(pci, device, 1024, PCI_LOOKUP_DEVICE,
+				pci_dev->vendor_id, pci_dev->device_id);
+		pci_free_dev(pci_dev);
+
+		obs_property_list_add_string(prop, device, list[i]->d_name);
 	}
+
+	pci_cleanup(pci);
 
 	while (n--) {
 		free(list[n]);

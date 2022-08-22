@@ -20,7 +20,7 @@
 
 #define _GNU_SOURCE
 
-#include <obs-module.h>
+#include <obs/obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
 #include <pci/pci.h>

@@ -136,6 +136,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "srgb",
 				    NULL);
 		break;
+#ifdef VIDEO_FORMAT_P010
 	case VIDEO_CS_2100_PQ:
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_pq", NULL);
@@ -144,6 +145,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_hlg", NULL);
 		break;
+#endif
 	}
 
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);

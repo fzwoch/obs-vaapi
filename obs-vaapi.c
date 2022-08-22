@@ -111,6 +111,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
 		break;
+#ifdef VIDEO_FORMAT_P010
 	case VIDEO_FORMAT_I010:
 		obs_encoder_set_preferred_video_format(encoder,
 						       VIDEO_FORMAT_P010);
@@ -118,6 +119,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
 				    NULL);
 		break;
+#endif
 	}
 
 	switch (video_info.colorspace) {
@@ -329,16 +331,15 @@ static bool encode(void *data, struct encoder_frame *frame,
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
 
-	gsize buffer_size;
+	gsize buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			    obs_encoder_get_height(vaapi->encoder) * 3 / 2;
 
+#ifdef VIDEO_FORMAT_P010
 	if (video_info.output_format == VIDEO_FORMAT_I010 ||
 	    video_info.output_format == VIDEO_FORMAT_P010) {
-		buffer_size = obs_encoder_get_width(vaapi->encoder) *
-			      obs_encoder_get_height(vaapi->encoder) * 3;
-	} else {
-		buffer_size = obs_encoder_get_width(vaapi->encoder) *
-			      obs_encoder_get_height(vaapi->encoder) * 3 / 2;
+		buffer_size *= 2;
 	}
+#endif
 
 	GstBuffer *buffer =
 		gst_buffer_new_wrapped_full(0, frame->data[0], buffer_size, 0,

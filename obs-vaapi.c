@@ -25,6 +25,10 @@
 #include <gst/app/app.h>
 #include <pci/pci.h>
 
+#if LIBOBS_API_MAJOR_VER < 28
+#warning "OBS header version < 28.x found - HDR features disabled"
+#endif
+
 #define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
 #define ENCODER_TYPE_DATA_H265 "VAAPI H.265"
 
@@ -111,7 +115,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
 		break;
-#ifdef VIDEO_FORMAT_P010
+#if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_FORMAT_I010:
 		obs_encoder_set_preferred_video_format(encoder,
 						       VIDEO_FORMAT_P010);
@@ -136,7 +140,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "srgb",
 				    NULL);
 		break;
-#ifdef VIDEO_FORMAT_P010
+#if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_CS_2100_PQ:
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_pq", NULL);
@@ -336,7 +340,7 @@ static bool encode(void *data, struct encoder_frame *frame,
 	gsize buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			    obs_encoder_get_height(vaapi->encoder) * 3 / 2;
 
-#ifdef VIDEO_FORMAT_P010
+#if LIBOBS_API_MAJOR_VER >= 28
 	if (video_info.output_format == VIDEO_FORMAT_I010 ||
 	    video_info.output_format == VIDEO_FORMAT_P010) {
 		buffer_size *= 2;

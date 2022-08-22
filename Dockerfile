@@ -32,4 +32,5 @@ RUN apt update \
 RUN wget https://github.com/obsproject/obs-studio/archive/refs/tags/28.0.0-rc1.tar.gz \
  && tar xvf 28.0.0-rc1.tar.gz \
  && mv obs-studio-28.0.0-rc1 obs \
+ && mv obs/libobs obs/obs \
  && rm 28.0.0-rc1.tar.gz

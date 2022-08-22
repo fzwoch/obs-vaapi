@@ -21,7 +21,7 @@ ninja -C build
 ## Option #2
 
 ```shell
-docker . -t obs-vaapi
+docker build . -t obs-vaapi
 docker run --rm -v $PWD:/obs-vaapi --rm obs-vaapi \
   /bin/bash -c "cd /obs-vaapi && meson build --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' && ninja -C build"
 ```

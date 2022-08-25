@@ -9,6 +9,66 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 [GStreamer]: https://gstreamer.freedesktop.org/
 [GStreamer OBS plugin]: https://github.com/fzwoch/obs-gstreamer/
 
+# Checklist
+
+1. Check VAAPI is working
+
+```shell
+$ vainfo
+libva info: VA-API version 1.15.0
+libva info: Trying to open /usr/lib/x86_64-linux-gnu/dri/radeonsi_drv_video.so
+libva info: Found init function __vaDriverInit_1_15
+libva info: va_openDriver() returns 0
+vainfo: VA-API version: 1.15 (libva 2.12.0)
+vainfo: Driver version: Mesa Gallium driver 22.2.0-rc3 for AMD Radeon RX 570 Series (polaris10, LLVM 14.0.6, DRM 3.46, 5.18.0-4-amd64)
+vainfo: Supported profile and entrypoints
+      VAProfileMPEG2Simple            :	VAEntrypointVLD
+      VAProfileMPEG2Main              :	VAEntrypointVLD
+      VAProfileVC1Simple              :	VAEntrypointVLD
+      VAProfileVC1Main                :	VAEntrypointVLD
+      VAProfileVC1Advanced            :	VAEntrypointVLD
+      VAProfileH264ConstrainedBaseline:	VAEntrypointVLD
+      VAProfileH264ConstrainedBaseline:	VAEntrypointEncSlice    ⇦
+      VAProfileH264Main               :	VAEntrypointVLD
+      VAProfileH264Main               :	VAEntrypointEncSlice    ⇦
+      VAProfileH264High               :	VAEntrypointVLD
+      VAProfileH264High               :	VAEntrypointEncSlice    ⇦
+      VAProfileHEVCMain               :	VAEntrypointVLD
+      VAProfileHEVCMain               :	VAEntrypointEncSlice    ⇦
+      VAProfileHEVCMain10             :	VAEntrypointVLD
+      VAProfileJPEGBaseline           :	VAEntrypointVLD
+```
+
+2. Check GStreamer is working
+
+```shell
+$ gst-inspect-1.0 vaapi
+Plugin Details:
+  Name                     vaapi
+  Description              VA-API based elements
+  Filename                 /usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstvaapi.so
+  Version                  1.20.3
+  License                  LGPL
+  Source module            gstreamer-vaapi
+  Source release date      2022-06-15
+  Binary package           gstreamer-vaapi
+  Origin URL               Unknown package origin
+
+  vaapidecodebin: VA-API Decode Bin
+  vaapih264dec: VA-API H264 decoder
+  vaapih264enc: VA-API H264 encoder    ⇦
+  vaapih265dec: VA-API H265 decoder
+  vaapih265enc: VA-API H265 encoder    ⇦
+  vaapijpegdec: VA-API JPEG decoder
+  vaapimpeg2dec: VA-API MPEG2 decoder
+  vaapipostproc: VA-API video postprocessing
+  vaapisink: VA-API sink
+  vaapivc1dec: VA-API VC1 decoder
+
+  10 features:
+  +-- 10 elements
+```
+
 # Build
 
 ## Option #1 - Local machine build

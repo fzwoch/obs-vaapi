@@ -155,6 +155,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
 	gst_caps_unref(caps);
 
+	GstElement *vaapipostproc =
+		gst_element_factory_make("vaapipostproc", NULL);
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
@@ -191,10 +193,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_unref(caps);
 	}
 
-	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapiencoder,
-			 parser, vaapi->appsink, NULL);
-	gst_element_link_many(vaapi->appsrc, vaapiencoder, parser,
-			      vaapi->appsink, NULL);
+	gst_bin_add_many(GST_BIN(vaapi->pipe), vaapi->appsrc, vaapipostproc,
+			 vaapiencoder, parser, vaapi->appsink, NULL);
+	gst_element_link_many(vaapi->appsrc, vaapipostproc, vaapiencoder,
+			      parser, vaapi->appsink, NULL);
 
 	obs_properties_t *properties = obs_encoder_properties(encoder);
 	for (obs_property_t *property = obs_properties_first(properties);

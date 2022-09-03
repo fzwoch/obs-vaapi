@@ -120,9 +120,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
 				    NULL);
 		break;
-	default:
-		obs_encoder_set_preferred_video_format(encoder,
-						       VIDEO_FORMAT_NV12);
 	case VIDEO_FORMAT_NV12:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
@@ -132,14 +129,15 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 				    NULL);
 		break;
 #if LIBOBS_API_MAJOR_VER >= 28
-	case VIDEO_FORMAT_I010:
-		obs_encoder_set_preferred_video_format(encoder,
-						       VIDEO_FORMAT_P010);
 	case VIDEO_FORMAT_P010:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
 				    NULL);
 		break;
 #endif
+	default:
+	break;
+		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", video_info.output_format);
+		return NULL;
 	}
 
 	switch (video_info.colorspace) {
@@ -336,13 +334,12 @@ static bool encode(void *data, struct encoder_frame *frame,
 		break;
 #if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_FORMAT_P010:
+		format = GST_VIDEO_FORMAT_P010_10LE;
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			      obs_encoder_get_height(vaapi->encoder) * 3;
 		break;
 #endif
 	default:
-		blog(LOG_ERROR, "[obs-vaapi] unhandled color format: %d",
-		     format);
 		break;
 	}
 

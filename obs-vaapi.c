@@ -23,6 +23,7 @@
 #include <obs/obs-module.h>
 #include <gst/gst.h>
 #include <gst/app/app.h>
+#include <gst/video/video.h>
 #include <pci/pci.h>
 
 #if LIBOBS_API_MAJOR_VER < 28
@@ -96,6 +97,17 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
 	vaapi->appsink = gst_element_factory_make("appsink", NULL);
 
+	gst_util_set_object_arg(G_OBJECT(vaapi->appsrc), "format", "time");
+
+	// Should never trigger as we block the encode function
+	// until the current buffer has been consumed. If we
+	// block for too long it should be reported as encoder
+	// overload in OBS.
+	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
+			 NULL);
+
+	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
+
 	GstCaps *caps = gst_caps_new_simple(
 		"video/x-raw", "framerate", GST_TYPE_FRACTION,
 		video_info.fps_num, video_info.fps_den, "width", G_TYPE_INT,
@@ -156,18 +168,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_caps_unref(caps);
 
 	GstElement *vaapipostproc =
-		gst_element_factory_make("vaapipostproc", NULL);
+		gst_element_factory_make("vapostproc", NULL);
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
-
-	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
-
-	// Should never trigger as we block the encode function
-	// until the current buffer has been consumed. If we
-	// block for too long it should be reported as encoder
-	// overload in OBS.
-	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
-			 NULL);
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih264enc", NULL);
@@ -322,6 +325,31 @@ static bool encode(void *data, struct encoder_frame *frame,
 		gst_buffer_new_wrapped_full(0, frame->data[0], buffer_size, 0,
 					    buffer_size, vaapi, destroy_notify);
 
+	GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
+	switch (video_info.output_format) {
+	case VIDEO_FORMAT_I420:
+		format = GST_VIDEO_FORMAT_I420;
+		break;
+	case VIDEO_FORMAT_NV12:
+		format = GST_VIDEO_FORMAT_NV12;
+		break;
+#if LIBOBS_API_MAJOR_VER >= 28
+	case VIDEO_FORMAT_P010:
+		format = GST_VIDEO_FORMAT_P010_10LE;
+		break;
+#endif
+	default:
+		break;
+	}
+
+	GstVideoMeta *meta = (GstVideoMeta *)gst_buffer_add_video_meta(
+		buffer, 0, format, obs_encoder_get_width(vaapi->encoder),
+		obs_encoder_get_height(vaapi->encoder));
+
+	for (int i = 0; frame->linesize[i]; i++) {
+		meta->stride[i] = frame->linesize[i];
+	}
+
 	GST_BUFFER_PTS(buffer) =
 		frame->pts *
 		(GST_SECOND / (packet->timebase_den / packet->timebase_num));
@@ -371,7 +399,7 @@ static bool encode(void *data, struct encoder_frame *frame,
 
 static void get_defaults2(obs_data_t *settings, void *type_data)
 {
-	GstElement *encoder;
+	GstElement *encoder = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
 		encoder = gst_element_factory_make("vaapih264enc", NULL);
@@ -524,7 +552,7 @@ static void populate_devices(obs_property_t *prop)
 
 static obs_properties_t *get_properties2(void *data, void *type_data)
 {
-	GstElement *encoder;
+	GstElement *encoder = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
 		encoder = gst_element_factory_make("vaapih264enc", NULL);

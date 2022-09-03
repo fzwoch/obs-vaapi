@@ -127,6 +127,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
 		break;
+	case VIDEO_FORMAT_RGBA:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "RGBA",
+				    NULL);
+		break;
 #if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_FORMAT_I010:
 		obs_encoder_set_preferred_video_format(encoder,
@@ -311,36 +315,40 @@ static bool encode(void *data, struct encoder_frame *frame,
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
 
-	gsize buffer_size = obs_encoder_get_width(vaapi->encoder) *
-			    obs_encoder_get_height(vaapi->encoder) * 3 / 2;
+	GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
+	gsize buffer_size = 0;
 
+	switch (video_info.output_format) {
+	case VIDEO_FORMAT_I420:
+		format = GST_VIDEO_FORMAT_I420;
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3 / 2;
+		break;
+	case VIDEO_FORMAT_NV12:
+		format = GST_VIDEO_FORMAT_NV12;
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3 / 2;
+		break;
+	case VIDEO_FORMAT_RGBA:
+		format = GST_VIDEO_FORMAT_RGBA;
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3;
+		break;
 #if LIBOBS_API_MAJOR_VER >= 28
-	if (video_info.output_format == VIDEO_FORMAT_I010 ||
-	    video_info.output_format == VIDEO_FORMAT_P010) {
-		buffer_size *= 2;
-	}
+	case VIDEO_FORMAT_P010:
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3;
+		break;
 #endif
+	default:
+		blog(LOG_ERROR, "[obs-vaapi] unhandled color format: %d",
+		     format);
+		break;
+	}
 
 	GstBuffer *buffer =
 		gst_buffer_new_wrapped_full(0, frame->data[0], buffer_size, 0,
 					    buffer_size, vaapi, destroy_notify);
-
-	GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
-	switch (video_info.output_format) {
-	case VIDEO_FORMAT_I420:
-		format = GST_VIDEO_FORMAT_I420;
-		break;
-	case VIDEO_FORMAT_NV12:
-		format = GST_VIDEO_FORMAT_NV12;
-		break;
-#if LIBOBS_API_MAJOR_VER >= 28
-	case VIDEO_FORMAT_P010:
-		format = GST_VIDEO_FORMAT_P010_10LE;
-		break;
-#endif
-	default:
-		break;
-	}
 
 	GstVideoMeta *meta = (GstVideoMeta *)gst_buffer_add_video_meta(
 		buffer, 0, format, obs_encoder_get_width(vaapi->encoder),

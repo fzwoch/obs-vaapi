@@ -135,7 +135,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		break;
 #endif
 	default:
-	break;
 		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", video_info.output_format);
 		return NULL;
 	}

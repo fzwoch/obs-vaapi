@@ -93,21 +93,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
 
-	vaapi->pipe = gst_pipeline_new(NULL);
-	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
-	vaapi->appsink = gst_element_factory_make("appsink", NULL);
-
-	gst_util_set_object_arg(G_OBJECT(vaapi->appsrc), "format", "time");
-
-	// Should never trigger as we block the encode function
-	// until the current buffer has been consumed. If we
-	// block for too long it should be reported as encoder
-	// overload in OBS.
-	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
-			 NULL);
-
-	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
-
 	GstCaps *caps = gst_caps_new_simple(
 		"video/x-raw", "framerate", GST_TYPE_FRACTION,
 		video_info.fps_num, video_info.fps_den, "width", G_TYPE_INT,
@@ -135,9 +120,26 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		break;
 #endif
 	default:
-		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", video_info.output_format);
+		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d",
+		     video_info.output_format);
+		gst_caps_unref(caps);
 		return NULL;
 	}
+
+	vaapi->pipe = gst_pipeline_new(NULL);
+	vaapi->appsrc = gst_element_factory_make("appsrc", NULL);
+	vaapi->appsink = gst_element_factory_make("appsink", NULL);
+
+	gst_util_set_object_arg(G_OBJECT(vaapi->appsrc), "format", "time");
+
+	// Should never trigger as we block the encode function
+	// until the current buffer has been consumed. If we
+	// block for too long it should be reported as encoder
+	// overload in OBS.
+	g_signal_connect(vaapi->appsrc, "enough-data", G_CALLBACK(enough_data),
+			 NULL);
+
+	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
 
 	switch (video_info.colorspace) {
 	case VIDEO_CS_601:

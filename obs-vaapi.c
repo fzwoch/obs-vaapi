@@ -745,7 +745,14 @@ MODULE_EXPORT bool obs_module_load(void)
 		.type_data = ENCODER_TYPE_DATA_H264,
 	};
 
-	GstElementFactory *encoder = gst_element_factory_find("vaapih264enc");
+	GstElementFactory *encoder = gst_element_factory_find("vapostproc");
+	if (encoder == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] vapostproc element not found");
+		return false;
+	}
+	gst_object_unref(encoder);
+
+	encoder = gst_element_factory_find("vaapih264enc");
 	if (encoder) {
 		blog(LOG_INFO, "[obs-vaapi] H.264 encoder - found");
 		gst_object_unref(encoder);

@@ -42,6 +42,30 @@ vainfo: Supported profile and entrypoints
 2. Check GStreamer is working
 
 ```shell
+$ gst-inspect-1.0 va
+Plugin Details:
+  Name                     va
+  Description              VA-API codecs plugin
+  Filename                 /usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstva.so
+  Version                  1.20.3
+  License                  LGPL
+  Source module            gst-plugins-bad
+  Source release date      2022-06-15
+  Binary package           GStreamer Bad Plugins (Debian)
+  Origin URL               http://packages.qa.debian.org/gst-plugins-bad1.0
+
+  vadeinterlace: VA-API Deinterlacer
+  vah264dec: VA-API H.264 Decoder
+  vah265dec: VA-API H.265 Decoder
+  vampeg2dec: VA-API Mpeg2 Decoder
+  vapostproc: VA-API Video Postprocessor
+  vavp9dec: VA-API VP9 Decoder
+
+  6 features:
+  +-- 6 elements
+```
+
+```shell
 $ gst-inspect-1.0 vaapi
 Plugin Details:
   Name                     vaapi

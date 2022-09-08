@@ -13,7 +13,7 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 
 1. Check VAAPI is working
 
-```shell
+```
 $ vainfo
 libva info: VA-API version 1.15.0
 libva info: Trying to open /usr/lib/x86_64-linux-gnu/dri/radeonsi_drv_video.so
@@ -41,7 +41,7 @@ vainfo: Supported profile and entrypoints
 
 2. Check GStreamer is working
 
-```shell
+```
 $ gst-inspect-1.0 va
 Plugin Details:
   Name                     va
@@ -58,14 +58,14 @@ Plugin Details:
   vah264dec: VA-API H.264 Decoder
   vah265dec: VA-API H.265 Decoder
   vampeg2dec: VA-API Mpeg2 Decoder
-  vapostproc: VA-API Video Postprocessor
+  vapostproc: VA-API Video Postprocessor    ⇦
   vavp9dec: VA-API VP9 Decoder
 
   6 features:
   +-- 6 elements
 ```
 
-```shell
+```
 $ gst-inspect-1.0 vaapi
 Plugin Details:
   Name                     vaapi

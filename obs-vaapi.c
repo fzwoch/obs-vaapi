@@ -726,7 +726,7 @@ MODULE_EXPORT bool obs_module_load(void)
 
 	gst_version(&major, &minor, &micro, &nano);
 
-	blog(LOG_INFO, "[obs-vaapi] build: %s, gst-runtime: %u.%u.%u",
+	blog(LOG_INFO, "[obs-vaapi] version: %s, gst-runtime: %u.%u.%u",
 	     obs_vaapi_version, major, minor, micro);
 
 	gst_init(NULL, NULL);

@@ -23,7 +23,7 @@ project('obs-vaapi', 'c')
 library('obs-vaapi',
 	'obs-vaapi.c',
 	vcs_tag(
-		command : ['git', 'rev-parse', '--short', 'HEAD'],
+		command : ['git', 'describe', '--tags', '--always'],
 		input : 'version.c.in',
 		output : 'version.c',
 	),

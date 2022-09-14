@@ -26,10 +26,6 @@
 #include <gst/video/video.h>
 #include <pci/pci.h>
 
-#if LIBOBS_API_MAJOR_VER < 28
-#warning "OBS header version < 28.x found - HDR features disabled"
-#endif
-
 #define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
 #define ENCODER_TYPE_DATA_H265 "VAAPI H.265"
 
@@ -113,12 +109,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "RGBA",
 				    NULL);
 		break;
-#if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_FORMAT_P010:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
 				    NULL);
 		break;
-#endif
 	default:
 		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d",
 		     video_info.output_format);
@@ -155,7 +149,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "srgb",
 				    NULL);
 		break;
-#if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_CS_2100_PQ:
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_pq", NULL);
@@ -164,7 +157,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
 				    "bt2100_hlg", NULL);
 		break;
-#endif
 	}
 
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
@@ -333,13 +325,11 @@ static bool encode(void *data, struct encoder_frame *frame,
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			      obs_encoder_get_height(vaapi->encoder) * 3;
 		break;
-#if LIBOBS_API_MAJOR_VER >= 28
 	case VIDEO_FORMAT_P010:
 		format = GST_VIDEO_FORMAT_P010_10LE;
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			      obs_encoder_get_height(vaapi->encoder) * 3;
 		break;
-#endif
 	default:
 		break;
 	}

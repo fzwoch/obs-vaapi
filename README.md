@@ -101,16 +101,16 @@ Plugin Details:
   +-- 10 elements
 ```
 
-# Build
+## Build
 
-## Option #1 - Local machine build
+### Option #1 - Local machine build
 
 ```shell
 meson --buildtype=release build
 ninja -C build
 ```
 
-## Option #2 - Release build
+### Option #2 - Release build
 
 ```shell
 docker build . -t obs-vaapi
@@ -121,7 +121,7 @@ docker run --rm -v $PWD:/obs-vaapi obs-vaapi /bin/bash -c \
   "cd /obs-vaapi && meson x86_64 --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' && ninja -C x86_64"
 ```
 
-### For aarch64
+#### For aarch64
 
 ```shell
 echo "[binaries]" > arm64.txt

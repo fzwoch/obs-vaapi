@@ -19,7 +19,7 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 
 ## Install
 
-One option is to copy the plugin to to current users's OBS plugin directory:
+One option is to copy the plugin to the current user's OBS plugin directory:
 
 `~/.config/obs-studio/plugins/obs-vaapi/bin/64bit/obs-vaapi.so`
 

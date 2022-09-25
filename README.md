@@ -17,6 +17,12 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 
 > Settings names and behavior may change depending on installed GStreamer version.
 
+## Install
+
+One option is to copy the plugin to to current users's OBS plugin directory:
+
+`~/.config/obs-studio/plugins/obs-vaapi/bin/64bit/obs-vaapi.so`
+
 ## Checklist
 
 1. Check VAAPI is working

@@ -9,7 +9,15 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 [GStreamer]: https://gstreamer.freedesktop.org/
 [GStreamer OBS plugin]: https://github.com/fzwoch/obs-gstreamer/
 
-# Checklist
+## Quick settings TL;DR
+
+- Set `bitrate` (e.g. `6000`).
+- Set `rate-control` to `Constant bitrate`.
+- Check `cabac`.
+
+> Settings names and behavior may change depending on installed GStreamer version.
+
+## Checklist
 
 1. Check VAAPI is working
 

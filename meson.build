@@ -28,7 +28,7 @@ library('obs-vaapi',
 		output : 'version.c',
 	),
 	dependencies : [
-		dependency('libobs', required : get_option('libobs')),
+		dependency('libobs', version : '>=28.0.0', required : get_option('libobs')),
 		dependency('gstreamer-1.0'),
 		dependency('gstreamer-app-1.0'),
 		dependency('gstreamer-video-1.0'),

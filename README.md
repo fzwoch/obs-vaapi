@@ -15,7 +15,7 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 - Set `rate-control` to `Constant bitrate`.
 - Check `cabac`.
 
-> Settings names and behavior may change depending on installed GStreamer version.
+> Settings names and behavior may change depending on selected codec and installed GStreamer version.
 
 ## Install
 

@@ -28,6 +28,9 @@
 
 #define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
 #define ENCODER_TYPE_DATA_H265 "VAAPI H.265"
+#define ENCODER_TYPE_DATA_AV1 "VAAPI AV1"
+#define ENCODER_TYPE_DATA_H264_LEGACY "VAAPI H.264 (Legacy)"
+#define ENCODER_TYPE_DATA_H265_LEGACY "VAAPI H.265 (Legacy)"
 
 OBS_DECLARE_MODULE()
 
@@ -167,8 +170,30 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
-	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
+	obs_encoder_get_display_name(obs_encoder_get_id(encoder));
+
+	if (g_strcmp0(obs_encoder_get_display_name(obs_encoder_get_id(encoder)),
+		      ENCODER_TYPE_DATA_H264) == 0) {
+		vaapiencoder = gst_element_factory_make("vah264enc", NULL);
+	} else if (g_strcmp0(obs_encoder_get_display_name(
+				     obs_encoder_get_id(encoder)),
+			     ENCODER_TYPE_DATA_H265) == 0) {
+		vaapiencoder = gst_element_factory_make("vah265enc", NULL);
+	} else if (g_strcmp0(obs_encoder_get_display_name(
+				     obs_encoder_get_id(encoder)),
+			     ENCODER_TYPE_DATA_AV1) == 0) {
+		vaapiencoder = gst_element_factory_make("vaav1enc", NULL);
+	} else if (g_strcmp0(obs_encoder_get_display_name(
+				     obs_encoder_get_id(encoder)),
+			     ENCODER_TYPE_DATA_H264_LEGACY) == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih264enc", NULL);
+	} else if (g_strcmp0(obs_encoder_get_display_name(
+				     obs_encoder_get_id(encoder)),
+			     ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
+		vaapiencoder = gst_element_factory_make("vaapih265enc", NULL);
+	}
+
+	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		parser = gst_element_factory_make("h264parse", NULL);
 
 		caps = gst_caps_new_simple("video/x-h264", "stream-format",
@@ -179,12 +204,21 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		g_object_set(vaapi->appsink, "caps", caps, NULL);
 		gst_caps_unref(caps);
 	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "hevc") == 0) {
-		vaapiencoder = gst_element_factory_make("vaapih265enc", NULL);
 		parser = gst_element_factory_make("h265parse", NULL);
 
 		caps = gst_caps_new_simple("video/x-h265", "stream-format",
 					   G_TYPE_STRING, "byte-stream",
 					   "alignment", G_TYPE_STRING, "au",
+					   NULL);
+
+		g_object_set(vaapi->appsink, "caps", caps, NULL);
+		gst_caps_unref(caps);
+	} else if (g_strcmp0(obs_encoder_get_codec(encoder), "av1") == 0) {
+		parser = gst_element_factory_make("av1parse", NULL);
+
+		caps = gst_caps_new_simple("video/x-av1", "stream-format",
+					   G_TYPE_STRING, "obu-stream",
+					   "alignment", G_TYPE_STRING, "frame",
 					   NULL);
 
 		g_object_set(vaapi->appsink, "caps", caps, NULL);
@@ -398,8 +432,14 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	GstElement *encoder = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
-		encoder = gst_element_factory_make("vaapih264enc", NULL);
+		encoder = gst_element_factory_make("va264enc", NULL);
 	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265) == 0) {
+		encoder = gst_element_factory_make("vah265enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_AV1) == 0) {
+		encoder = gst_element_factory_make("vaav1enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264_LEGACY) == 0) {
+		encoder = gst_element_factory_make("vaapih264enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
 		encoder = gst_element_factory_make("vaapih265enc", NULL);
 	}
 
@@ -551,8 +591,14 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 	GstElement *encoder = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
-		encoder = gst_element_factory_make("vaapih264enc", NULL);
+		encoder = gst_element_factory_make("vah264enc", NULL);
 	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265) == 0) {
+		encoder = gst_element_factory_make("vah265enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_AV1) == 0) {
+		encoder = gst_element_factory_make("vaav1enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264_LEGACY) == 0) {
+		encoder = gst_element_factory_make("vaapih264enc", NULL);
+	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
 		encoder = gst_element_factory_make("vaapih265enc", NULL);
 	}
 
@@ -722,7 +768,7 @@ MODULE_EXPORT bool obs_module_load(void)
 	gst_init(NULL, NULL);
 
 	struct obs_encoder_info vaapi = {
-		.id = "obs-vaapi-h264",
+		.id = "obs-va-h264",
 		.type = OBS_ENCODER_VIDEO,
 		.codec = "h264",
 		.get_name = get_name,
@@ -742,7 +788,7 @@ MODULE_EXPORT bool obs_module_load(void)
 	}
 	gst_object_unref(encoder);
 
-	encoder = gst_element_factory_find("vaapih264enc");
+	encoder = gst_element_factory_find("vah264enc");
 	if (encoder) {
 		blog(LOG_INFO, "[obs-vaapi] H.264 encoder - found");
 		gst_object_unref(encoder);
@@ -751,17 +797,59 @@ MODULE_EXPORT bool obs_module_load(void)
 		blog(LOG_INFO, "[obs-vaapi] H.264 encoder - not found");
 	}
 
-	vaapi.id = "obs-vaapi-h265";
+	vaapi.id = "obs-va-h265";
 	vaapi.codec = "hevc";
 	vaapi.type_data = ENCODER_TYPE_DATA_H265;
 
-	encoder = gst_element_factory_find("vaapih265enc");
+	encoder = gst_element_factory_find("vah265enc");
 	if (encoder) {
 		blog(LOG_INFO, "[obs-vaapi] H.265 encoder - found");
 		gst_object_unref(encoder);
 		obs_register_encoder(&vaapi);
 	} else {
 		blog(LOG_INFO, "[obs-vaapi] H.265 encoder - not found");
+	}
+
+	vaapi.id = "obs-va-av1";
+	vaapi.codec = "av1";
+	vaapi.type_data = ENCODER_TYPE_DATA_AV1;
+
+	encoder = gst_element_factory_find("vaav1enc");
+	if (encoder) {
+		blog(LOG_INFO, "[obs-vaapi] AV1 encoder - found");
+		gst_object_unref(encoder);
+		obs_register_encoder(&vaapi);
+	} else {
+		blog(LOG_INFO, "[obs-vaapi] AV1 encoder - not found");
+	}
+
+	vaapi.id = "obs-vaapi-h264";
+	vaapi.codec = "h264";
+	vaapi.type_data = ENCODER_TYPE_DATA_H264_LEGACY;
+	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
+
+	encoder = gst_element_factory_find("vaapih264enc");
+	if (encoder) {
+		blog(LOG_INFO, "[obs-vaapi] H.264 encoder (legacy) - found");
+		gst_object_unref(encoder);
+		obs_register_encoder(&vaapi);
+	} else {
+		blog(LOG_INFO,
+		     "[obs-vaapi] H.264 encoder (legacy) - not found");
+	}
+
+	vaapi.id = "obs-vaapi-h265";
+	vaapi.codec = "hevc";
+	vaapi.type_data = ENCODER_TYPE_DATA_H265_LEGACY;
+
+	encoder = gst_element_factory_find("vaapih265enc");
+	if (encoder) {
+		blog(LOG_INFO, "[obs-vaapi] H.265 encoder (legacy) - found");
+		gst_object_unref(encoder);
+		obs_register_encoder(&vaapi);
+	} else {
+		blog(LOG_INFO,
+		     "[obs-vaapi] H.265 encoder (legacy) - not found");
 	}
 
 	return true;

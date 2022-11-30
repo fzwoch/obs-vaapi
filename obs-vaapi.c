@@ -826,7 +826,7 @@ MODULE_EXPORT bool obs_module_load(void)
 	vaapi.id = "obs-vaapi-h264";
 	vaapi.codec = "h264";
 	vaapi.type_data = ENCODER_TYPE_DATA_H264_LEGACY;
-	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
+//	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
 
 	encoder = gst_element_factory_find("vaapih264enc");
 	if (encoder) {

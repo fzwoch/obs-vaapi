@@ -218,7 +218,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		caps = gst_caps_new_simple("video/x-av1", "stream-format",
 					   G_TYPE_STRING, "obu-stream",
-					   "alignment", G_TYPE_STRING, "frame",
+					   "alignment", G_TYPE_STRING, "tu",
 					   NULL);
 
 		g_object_set(vaapi->appsink, "caps", caps, NULL);

@@ -432,7 +432,7 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	GstElement *encoder = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
-		encoder = gst_element_factory_make("va264enc", NULL);
+		encoder = gst_element_factory_make("vah264enc", NULL);
 	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H265) == 0) {
 		encoder = gst_element_factory_make("vah265enc", NULL);
 	} else if (g_strcmp0(type_data, ENCODER_TYPE_DATA_AV1) == 0) {

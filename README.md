@@ -2,7 +2,7 @@
 
 [GStreamer] based VAAPI encoder implementation. Taken out of the [GStreamer OBS plugin] as a standalone plugin. Simply because the FFMPEG VAAPI implementation shows performance bottlenecks on some AMD hardware.
 
-Supports H.264 and H.265.
+Supports H.264, H.265 and AV1.
 
 Note that not all options in the encoder properties may be working. VAAPI is just an interface and it is up to the GPU hardware and driver what is actually supported. Not all options make sense to change.
 
@@ -25,16 +25,16 @@ One option is to copy the plugin to the current user's OBS plugin directory:
 
 ## Checklist
 
-1. Check VAAPI is working
+1. Check VAAPI is working. You are looking for `VAEntrypointEncSlice` entry points.
 
 ```
 $ vainfo
-libva info: VA-API version 1.15.0
+libva info: VA-API version 1.16.0
 libva info: Trying to open /usr/lib/x86_64-linux-gnu/dri/radeonsi_drv_video.so
-libva info: Found init function __vaDriverInit_1_15
+libva info: Found init function __vaDriverInit_1_16
 libva info: va_openDriver() returns 0
-vainfo: VA-API version: 1.15 (libva 2.12.0)
-vainfo: Driver version: Mesa Gallium driver 22.2.0-rc3 for AMD Radeon RX 570 Series (polaris10, LLVM 14.0.6, DRM 3.46, 5.18.0-4-amd64)
+vainfo: VA-API version: 1.16 (libva 2.12.0)
+vainfo: Driver version: Mesa Gallium driver 22.3.0 for AMD Radeon RX 6600 (navi23, LLVM 15.0.6, DRM 3.48, 6.0.0-6-amd64)
 vainfo: Supported profile and entrypoints
       VAProfileMPEG2Simple            :	VAEntrypointVLD
       VAProfileMPEG2Main              :	VAEntrypointVLD
@@ -42,15 +42,20 @@ vainfo: Supported profile and entrypoints
       VAProfileVC1Main                :	VAEntrypointVLD
       VAProfileVC1Advanced            :	VAEntrypointVLD
       VAProfileH264ConstrainedBaseline:	VAEntrypointVLD
-      VAProfileH264ConstrainedBaseline:	VAEntrypointEncSlice    ⇦
+      VAProfileH264ConstrainedBaseline:	VAEntrypointEncSlice    ←
       VAProfileH264Main               :	VAEntrypointVLD
-      VAProfileH264Main               :	VAEntrypointEncSlice    ⇦
+      VAProfileH264Main               :	VAEntrypointEncSlice    ←
       VAProfileH264High               :	VAEntrypointVLD
-      VAProfileH264High               :	VAEntrypointEncSlice    ⇦
+      VAProfileH264High               :	VAEntrypointEncSlice    ←
       VAProfileHEVCMain               :	VAEntrypointVLD
-      VAProfileHEVCMain               :	VAEntrypointEncSlice    ⇦
+      VAProfileHEVCMain               :	VAEntrypointEncSlice    ←
       VAProfileHEVCMain10             :	VAEntrypointVLD
+      VAProfileHEVCMain10             :	VAEntrypointEncSlice    ←
       VAProfileJPEGBaseline           :	VAEntrypointVLD
+      VAProfileVP9Profile0            :	VAEntrypointVLD
+      VAProfileVP9Profile2            :	VAEntrypointVLD
+      VAProfileAV1Profile0            :	VAEntrypointVLD
+
 ```
 
 2. Check GStreamer is working

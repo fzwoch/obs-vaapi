@@ -55,6 +55,7 @@ vainfo: Supported profile and entrypoints
       VAProfileVP9Profile0            :	VAEntrypointVLD
       VAProfileVP9Profile2            :	VAEntrypointVLD
       VAProfileAV1Profile0            :	VAEntrypointVLD
+      VAProfileNone                   :	VAEntrypointVideoProc
 
 ```
 

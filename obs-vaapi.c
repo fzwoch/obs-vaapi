@@ -20,10 +20,10 @@
 
 #define _GNU_SOURCE
 
-#include <obs/obs-module.h>
-#include <gst/gst.h>
 #include <gst/app/app.h>
+#include <gst/gst.h>
 #include <gst/video/video.h>
+#include <obs/obs-module.h>
 #include <pci/pci.h>
 
 #define ENCODER_TYPE_DATA_H264 "VAAPI H.264"
@@ -280,6 +280,11 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstBus *bus = gst_element_get_bus(vaapi->pipe);
 	gst_bus_add_watch(bus, bus_callback, NULL);
 	gst_object_unref(bus);
+
+	blog(LOG_INFO, "[obs-vaapi] codec: %s, %dx%d@%d/%d, format: %d ",
+	     obs_encoder_get_codec(encoder), obs_encoder_get_width(encoder),
+	     obs_encoder_get_height(encoder), video_info.fps_num,
+	     video_info.fps_den, video_info.output_format);
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 
@@ -826,7 +831,7 @@ MODULE_EXPORT bool obs_module_load(void)
 	vaapi.id = "obs-vaapi-h264";
 	vaapi.codec = "h264";
 	vaapi.type_data = ENCODER_TYPE_DATA_H264_LEGACY;
-//	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
+	//	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
 
 	encoder = gst_element_factory_find("vaapih264enc");
 	if (encoder) {

@@ -18,7 +18,12 @@
 # along with obs-vaapi. If not, see <http://www.gnu.org/licenses/>.
 #
 
-project('obs-vaapi', 'c')
+project('obs-vaapi', 'c',
+  default_options : [
+    'prefix=~/.config/obs-studio/plugins/obs-vaapi/bin/64bit',
+    'libdir='
+  ],
+)
 
 library('obs-vaapi',
 	'obs-vaapi.c',
@@ -37,5 +42,4 @@ library('obs-vaapi',
 	gnu_symbol_visibility : 'hidden',
 	name_prefix : '',
 	install : true,
-	install_dir : join_paths(get_option('libdir'), 'obs-plugins'),
 )

@@ -233,45 +233,42 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	obs_properties_t *properties = obs_encoder_properties(encoder);
 	for (obs_property_t *property = obs_properties_first(properties);
 	     property; obs_property_next(&property)) {
+		const char *name = obs_property_name(property);
 		switch (obs_property_get_type(property)) {
 		case OBS_PROPERTY_TEXT:
-			g_object_set(vaapiencoder, obs_property_name(property),
-				     obs_data_get_string(
-					     settings,
-					     obs_property_name(property)),
-				     NULL);
+			g_object_set(vaapiencoder, name,
+				     obs_data_get_string(settings, name), NULL);
+			blog(LOG_INFO, "[obs-vaapi] %s: %s", name,
+			     obs_data_get_string(settings, name));
 			break;
 		case OBS_PROPERTY_INT:
-			g_object_set(
-				vaapiencoder, obs_property_name(property),
-				obs_data_get_int(settings,
-						 obs_property_name(property)),
-				NULL);
+			g_object_set(vaapiencoder, name,
+				     obs_data_get_int(settings, name), NULL);
+			blog(LOG_INFO, "[obs-vaapi] %s: %lld", name,
+			     obs_data_get_int(settings, name));
 			break;
 		case OBS_PROPERTY_BOOL:
-			g_object_set(
-				vaapiencoder, obs_property_name(property),
-				obs_data_get_bool(settings,
-						  obs_property_name(property)),
-				NULL);
+			g_object_set(vaapiencoder, name,
+				     obs_data_get_bool(settings, name), NULL);
+			blog(LOG_INFO, "[obs-vaapi] %s: %d", name,
+			     obs_data_get_bool(settings, name));
 			break;
 		case OBS_PROPERTY_FLOAT:
-			g_object_set(vaapiencoder, obs_property_name(property),
-				     obs_data_get_double(
-					     settings,
-					     obs_property_name(property)),
-				     NULL);
+			g_object_set(vaapiencoder, name,
+				     obs_data_get_double(settings, name), NULL);
+			blog(LOG_INFO, "[obs-vaapi] %s: %f", name,
+			     obs_data_get_double(settings, name));
 			break;
 		case OBS_PROPERTY_LIST:
-			gst_util_set_object_arg(
-				G_OBJECT(vaapiencoder),
-				obs_property_name(property),
-				obs_data_get_string(
-					settings, obs_property_name(property)));
+			gst_util_set_object_arg(G_OBJECT(vaapiencoder), name,
+						obs_data_get_string(settings,
+								    name));
+			blog(LOG_INFO, "[obs-vaapi] %s: %s", name,
+			     obs_data_get_string(settings, name));
 			break;
 		default:
 			blog(LOG_WARNING, "[obs-vaapi] unhandled property: %s",
-			     obs_property_name(property));
+			     name);
 			break;
 		}
 	}

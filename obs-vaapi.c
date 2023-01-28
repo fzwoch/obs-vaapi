@@ -107,6 +107,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
 				    NULL);
 		break;
+	case VIDEO_FORMAT_I444:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "Y444",
+				    NULL);
+		break;
 	case VIDEO_FORMAT_NV12:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
 				    NULL);
@@ -178,8 +182,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	if (g_strcmp0(obs_encoder_get_display_name(obs_encoder_get_id(encoder)),
 		      ENCODER_TYPE_DATA_H264) == 0) {
 		vaapiencoder = gst_element_factory_make("vah264enc", NULL);
-	} else if (g_strcmp0(obs_encoder_get_display_name(obs_encoder_get_id(encoder)),
-			  ENCODER_TYPE_DATA_H264_LOWPOWER) == 0) {
+	} else if (g_strcmp0(obs_encoder_get_display_name(
+				     obs_encoder_get_id(encoder)),
+			     ENCODER_TYPE_DATA_H264_LOWPOWER) == 0) {
 		vaapiencoder = gst_element_factory_make("vah264lpenc", NULL);
 	} else if (g_strcmp0(obs_encoder_get_display_name(
 				     obs_encoder_get_id(encoder)),
@@ -834,7 +839,8 @@ MODULE_EXPORT bool obs_module_load(void)
 		gst_object_unref(encoder);
 		obs_register_encoder(&vaapi);
 	} else {
-		blog(LOG_INFO, "[obs-vaapi] H.264 encoder (low power) - not found");
+		blog(LOG_INFO,
+		     "[obs-vaapi] H.264 encoder (low power) - not found");
 	}
 
 	vaapi.id = "obs-va-h265";
@@ -859,7 +865,8 @@ MODULE_EXPORT bool obs_module_load(void)
 		gst_object_unref(encoder);
 		obs_register_encoder(&vaapi);
 	} else {
-		blog(LOG_INFO, "[obs-vaapi] H.265 encoder (low power) - not found");
+		blog(LOG_INFO,
+		     "[obs-vaapi] H.265 encoder (low power) - not found");
 	}
 
 	vaapi.id = "obs-va-av1";
@@ -884,7 +891,8 @@ MODULE_EXPORT bool obs_module_load(void)
 		gst_object_unref(encoder);
 		obs_register_encoder(&vaapi);
 	} else {
-		blog(LOG_INFO, "[obs-vaapi] AV1 encoder (low power) - not found");
+		blog(LOG_INFO,
+		     "[obs-vaapi] AV1 encoder (low power) - not found");
 	}
 
 	vaapi.id = "obs-vaapi-h264";

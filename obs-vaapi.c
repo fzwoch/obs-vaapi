@@ -107,12 +107,12 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420",
 				    NULL);
 		break;
-	case VIDEO_FORMAT_I444:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "Y444",
-				    NULL);
-		break;
 	case VIDEO_FORMAT_NV12:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12",
+				    NULL);
+		break;
+	case VIDEO_FORMAT_I444:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "Y444",
 				    NULL);
 		break;
 	case VIDEO_FORMAT_RGBA:
@@ -379,6 +379,11 @@ static bool encode(void *data, struct encoder_frame *frame,
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			      obs_encoder_get_height(vaapi->encoder) * 3 / 2;
 		break;
+	case VIDEO_FORMAT_I444:
+		format = GST_VIDEO_FORMAT_Y444;
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3;
+		break;
 	case VIDEO_FORMAT_RGBA:
 		format = GST_VIDEO_FORMAT_RGBA;
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
@@ -386,6 +391,11 @@ static bool encode(void *data, struct encoder_frame *frame,
 		break;
 	case VIDEO_FORMAT_P010:
 		format = GST_VIDEO_FORMAT_P010_10LE;
+		buffer_size = obs_encoder_get_width(vaapi->encoder) *
+			      obs_encoder_get_height(vaapi->encoder) * 3;
+		break;
+	case VIDEO_FORMAT_I010:
+		format = GST_VIDEO_FORMAT_I420_10LE;
 		buffer_size = obs_encoder_get_width(vaapi->encoder) *
 			      obs_encoder_get_height(vaapi->encoder) * 3;
 		break;

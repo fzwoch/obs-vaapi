@@ -123,6 +123,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE",
 				    NULL);
 		break;
+	case VIDEO_FORMAT_I010:
+		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420_10LE",
+				    NULL);
+		break;
 	default:
 		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d",
 		     video_info.output_format);

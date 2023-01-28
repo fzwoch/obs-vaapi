@@ -1,6 +1,6 @@
 /*
  * obs-vaapi. OBS Studio plugin.
- * Copyright (C) 2022 Florian Zwoch <fzwoch@gmail.com>
+ * Copyright (C) 2022-2023 Florian Zwoch <fzwoch@gmail.com>
  *
  * This file is part of obs-vaapi.
  *

@@ -500,7 +500,8 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 
 		if (param->owner_type == G_TYPE_OBJECT ||
 		    param->owner_type == GST_TYPE_OBJECT ||
-		    param->owner_type == GST_TYPE_PAD) {
+		    param->owner_type == GST_TYPE_PAD ||
+		    (param->flags & G_PARAM_WRITABLE) == 0) {
 			continue;
 		}
 
@@ -679,7 +680,8 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 
 		if (param->owner_type == G_TYPE_OBJECT ||
 		    param->owner_type == GST_TYPE_OBJECT ||
-		    param->owner_type == GST_TYPE_PAD) {
+		    param->owner_type == GST_TYPE_PAD ||
+		    (param->flags & G_PARAM_WRITABLE) == 0) {
 			continue;
 		}
 

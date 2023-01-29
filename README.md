@@ -9,14 +9,6 @@ Note that not all options in the encoder properties may be working. VAAPI is jus
 [GStreamer]: https://gstreamer.freedesktop.org/
 [GStreamer OBS plugin]: https://github.com/fzwoch/obs-gstreamer/
 
-## Quick settings TL;DR
-
-- Set `bitrate` (e.g. `6000`).
-- Set `rate-control` to `Constant bitrate`.
-- Check `cabac`.
-
-> Settings names and behavior may change depending on selected codec and installed GStreamer version.
-
 ## Install
 
 One option is to copy the plugin to the current user's OBS plugin directory:
@@ -66,51 +58,30 @@ $ gst-inspect-1.0 va
 Plugin Details:
   Name                     va
   Description              VA-API codecs plugin
-  Filename                 /usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstva.so
-  Version                  1.20.3
+  Filename                 /lib/x86_64-linux-gnu/gstreamer-1.0/libgstva.so
+  Version                  1.22.0
   License                  LGPL
   Source module            gst-plugins-bad
-  Source release date      2022-06-15
+  Documentation            https://gstreamer.freedesktop.org/documentation/va/
+  Source release date      2023-01-23
   Binary package           GStreamer Bad Plugins (Debian)
-  Origin URL               http://packages.qa.debian.org/gst-plugins-bad1.0
+  Origin URL               https://tracker.debian.org/pkg/gst-plugins-bad1.0
 
+  vaav1dec: VA-API AV1 Decoder
+  vacompositor: VA-API Video Compositor
   vadeinterlace: VA-API Deinterlacer
   vah264dec: VA-API H.264 Decoder
+  vah264enc: VA-API H.264 Encoder           ←
   vah265dec: VA-API H.265 Decoder
+  vah265enc: VA-API H.265 Encoder           ←
+  vajpegdec: VA-API JPEG Decoder
   vampeg2dec: VA-API Mpeg2 Decoder
-  vapostproc: VA-API Video Postprocessor    ⇦
+  vapostproc: VA-API Video Postprocessor    ←
   vavp9dec: VA-API VP9 Decoder
 
-  6 features:
-  +-- 6 elements
-```
+  11 features:
+  +-- 11 elements
 
-```
-$ gst-inspect-1.0 vaapi
-Plugin Details:
-  Name                     vaapi
-  Description              VA-API based elements
-  Filename                 /usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstvaapi.so
-  Version                  1.20.3
-  License                  LGPL
-  Source module            gstreamer-vaapi
-  Source release date      2022-06-15
-  Binary package           gstreamer-vaapi
-  Origin URL               Unknown package origin
-
-  vaapidecodebin: VA-API Decode Bin
-  vaapih264dec: VA-API H264 decoder
-  vaapih264enc: VA-API H264 encoder    ⇦
-  vaapih265dec: VA-API H265 decoder
-  vaapih265enc: VA-API H265 encoder    ⇦
-  vaapijpegdec: VA-API JPEG decoder
-  vaapimpeg2dec: VA-API MPEG2 decoder
-  vaapipostproc: VA-API video postprocessing
-  vaapisink: VA-API sink
-  vaapivc1dec: VA-API VC1 decoder
-
-  10 features:
-  +-- 10 elements
 ```
 
 ## Build
@@ -118,8 +89,8 @@ Plugin Details:
 ### Option #1 - Local machine build
 
 ```shell
-meson --buildtype=release build
-ninja -C build
+meson setup --buildtype=release build
+meson install -C build
 ```
 
 ### Option #2 - Release build
@@ -127,6 +98,8 @@ ninja -C build
 ```shell
 docker build . -t obs-vaapi
 ```
+
+#### For x86_64
 
 ```shell
 docker run --rm -v $PWD:/obs-vaapi obs-vaapi /bin/bash -c \

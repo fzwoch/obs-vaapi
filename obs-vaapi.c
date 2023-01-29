@@ -89,9 +89,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	vaapi->encoder = encoder;
 
-	g_setenv("GST_VAAPI_DRM_DEVICE",
-		 obs_data_get_string(settings, "device"), TRUE);
-
 	struct obs_video_info video_info;
 	obs_get_video_info(&video_info);
 
@@ -214,6 +211,14 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 				     obs_encoder_get_id(encoder)),
 			     ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
 		vaapiencoder = gst_element_factory_make("vaapih265enc", NULL);
+	}
+
+	if (g_strcmp0(obs_encoder_get_display_name(obs_encoder_get_id(encoder)),
+		      ENCODER_TYPE_DATA_H264_LEGACY) == 0 ||
+	    g_strcmp0(obs_encoder_get_display_name(obs_encoder_get_id(encoder)),
+		      ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
+		g_setenv("GST_VAAPI_DRM_DEVICE",
+			 obs_data_get_string(settings, "device"), TRUE);
 	}
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
@@ -630,6 +635,7 @@ static void populate_devices(obs_property_t *prop)
 static obs_properties_t *get_properties2(void *data, void *type_data)
 {
 	GstElement *encoder = NULL;
+	obs_property_t *property = NULL;
 
 	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264) == 0) {
 		encoder = gst_element_factory_make("vah264enc", NULL);
@@ -651,14 +657,18 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 
 	obs_properties_t *properties = obs_properties_create();
 
-	obs_property_t *property = obs_properties_add_list(
-		properties, "device", "device", OBS_COMBO_TYPE_LIST,
-		OBS_COMBO_FORMAT_STRING);
+	if (g_strcmp0(type_data, ENCODER_TYPE_DATA_H264_LEGACY) == 0 ||
+	    g_strcmp0(type_data, ENCODER_TYPE_DATA_H265_LEGACY) == 0) {
+		property = obs_properties_add_list(properties, "device",
+						   "device",
+						   OBS_COMBO_TYPE_LIST,
+						   OBS_COMBO_FORMAT_STRING);
 
-	populate_devices(property);
+		populate_devices(property);
 
-	obs_property_set_long_description(property,
-					  "Specify DRM device to use");
+		obs_property_set_long_description(property,
+						  "Specify DRM device to use");
+	}
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(

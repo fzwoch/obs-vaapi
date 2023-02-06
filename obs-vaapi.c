@@ -258,8 +258,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_element_link_many(vaapi->appsrc, vaapipostproc, vaapiencoder,
 			      parser, vaapi->appsink, NULL);
 
-	blog(LOG_INFO, "[obs-vaapi] id: %s", obs_encoder_get_id(encoder));
-
 	obs_properties_t *properties = obs_encoder_properties(encoder);
 	for (obs_property_t *property = obs_properties_first(properties);
 	     property; obs_property_next(&property)) {
@@ -309,7 +307,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_object_unref(bus);
 
 	blog(LOG_INFO, "[obs-vaapi] codec: %s, %dx%d@%d/%d, format: %d ",
-	     obs_encoder_get_codec(encoder), obs_encoder_get_width(encoder),
+	     obs_encoder_get_id(encoder), obs_encoder_get_width(encoder),
 	     obs_encoder_get_height(encoder), video_info.fps_num,
 	     video_info.fps_den, video_info.output_format);
 

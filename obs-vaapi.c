@@ -472,9 +472,9 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	} else if (g_str_has_prefix(type_data, "obs-vaapi-")) {
 		encoder = gst_element_factory_make(
 			type_data + strlen("obs-vaapi-"), NULL);
-	}
 
-	obs_data_set_default_string(settings, "device", "");
+		obs_data_set_default_string(settings, "device", "");
+	}
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(

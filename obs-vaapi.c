@@ -28,7 +28,7 @@
 
 OBS_DECLARE_MODULE()
 
-GHashTable *hash_table;
+static GHashTable *hash_table;
 
 static void free_data(gpointer data)
 {

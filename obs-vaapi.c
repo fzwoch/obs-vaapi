@@ -28,6 +28,13 @@
 
 OBS_DECLARE_MODULE()
 
+GHashTable *hash_table;
+
+static void free_data(gpointer data)
+{
+	g_free(data);
+}
+
 typedef struct {
 	obs_encoder_t *encoder;
 	GstElement *pipe;
@@ -98,10 +105,10 @@ static const char *get_name(void *type_data)
 			: g_strcmp0(fields[2], "h265") == 0 ? "H.265"
 							    : "AV1",
 			fields[1],
-			g_strcmp0(fields[3], "lp") == 0 ? " (Low Power)"
-							: ""); //leak
+			g_strcmp0(fields[3], "lp") == 0 ? " (Low Power)" : "");
 
 		g_strfreev(fields);
+		g_hash_table_insert(hash_table, name, NULL);
 		return name;
 	}
 
@@ -798,6 +805,9 @@ MODULE_EXPORT bool obs_module_load(void)
 
 	gst_init(NULL, NULL);
 
+	hash_table =
+		g_hash_table_new_full(g_str_hash, g_str_equal, free_data, NULL);
+
 	struct obs_encoder_info vaapi = {
 		.id = "obs-va-h264",
 		.type = OBS_ENCODER_VIDEO,
@@ -848,7 +858,8 @@ MODULE_EXPORT bool obs_module_load(void)
 		if (found) {
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-va-%s",
-				gst_plugin_feature_get_name(feature)); // leak
+				gst_plugin_feature_get_name(feature));
+			g_hash_table_insert(hash_table, vaapi.type_data, NULL);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-va-"));
@@ -879,7 +890,8 @@ MODULE_EXPORT bool obs_module_load(void)
 		if (found) {
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-vaapi-%s",
-				gst_plugin_feature_get_name(feature)); // leak
+				gst_plugin_feature_get_name(feature));
+			g_hash_table_insert(hash_table, vaapi.type_data, NULL);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-vaapi-"));
@@ -889,4 +901,9 @@ MODULE_EXPORT bool obs_module_load(void)
 	gst_plugin_feature_list_free(list);
 
 	return true;
+}
+
+MODULE_EXPORT void obs_module_unload(void)
+{
+	g_hash_table_unref(hash_table);
 }

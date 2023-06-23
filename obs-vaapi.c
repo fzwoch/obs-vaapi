@@ -30,11 +30,6 @@ OBS_DECLARE_MODULE()
 
 static GHashTable *hash_table;
 
-static void free_data(gpointer data)
-{
-	g_free(data);
-}
-
 typedef struct {
 	obs_encoder_t *encoder;
 	GstElement *pipe;
@@ -806,7 +801,7 @@ MODULE_EXPORT bool obs_module_load(void)
 	gst_init(NULL, NULL);
 
 	hash_table =
-		g_hash_table_new_full(g_str_hash, g_str_equal, free_data, NULL);
+		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
 	struct obs_encoder_info vaapi = {
 		.id = "obs-va-h264",

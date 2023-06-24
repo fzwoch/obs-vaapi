@@ -103,7 +103,13 @@ static const char *get_name(void *type_data)
 			g_strcmp0(fields[3], "lp") == 0 ? " (Low Power)" : "");
 
 		g_strfreev(fields);
-		g_hash_table_insert(hash_table, name, NULL);
+
+		gpointer key = g_hash_table_lookup(hash_table, name);
+		if (key != NULL) {
+			g_free(name);
+			return key;
+		}
+		g_hash_table_insert(hash_table, name, name);
 		return name;
 	}
 
@@ -854,7 +860,7 @@ MODULE_EXPORT bool obs_module_load(void)
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-va-%s",
 				gst_plugin_feature_get_name(feature));
-			g_hash_table_insert(hash_table, vaapi.type_data, NULL);
+			g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-va-"));
@@ -886,7 +892,7 @@ MODULE_EXPORT bool obs_module_load(void)
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-vaapi-%s",
 				gst_plugin_feature_get_name(feature));
-			g_hash_table_insert(hash_table, vaapi.type_data, NULL);
+			g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-vaapi-"));

@@ -822,12 +822,12 @@ MODULE_EXPORT bool obs_module_load(void)
 		.get_extra_data = get_extra_data,
 	};
 
-	GstElementFactory *postproc = gst_element_factory_find("vapostproc");
-	if (postproc == NULL) {
-		blog(LOG_ERROR, "[obs-vaapi] vapostproc element not found");
+	GstPlugin *plugin = gst_registry_find_plugin(gst_registry_get(), "va");
+	if (plugin == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] GStreamer 'va' plugin not found");
 		return false;
 	}
-	gst_object_unref(postproc);
+	gst_object_unref(plugin);
 
 	GList *list = gst_registry_get_feature_list_by_plugin(
 		gst_registry_get(), "va");

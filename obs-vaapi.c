@@ -822,6 +822,13 @@ MODULE_EXPORT bool obs_module_load(void)
 
 	gst_init(NULL, NULL);
 
+	GstPlugin *plugin = gst_registry_find_plugin(gst_registry_get(), "va");
+	if (plugin == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] GStreamer 'va' plugin not found");
+		return false;
+	}
+	gst_object_unref(plugin);
+
 	hash_table =
 		g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
@@ -837,13 +844,6 @@ MODULE_EXPORT bool obs_module_load(void)
 		.encode = encode,
 		.get_extra_data = get_extra_data,
 	};
-
-	GstPlugin *plugin = gst_registry_find_plugin(gst_registry_get(), "va");
-	if (plugin == NULL) {
-		blog(LOG_ERROR, "[obs-vaapi] GStreamer 'va' plugin not found");
-		return false;
-	}
-	gst_object_unref(plugin);
 
 	GList *list = gst_registry_get_feature_list_by_plugin(
 		gst_registry_get(), "va");

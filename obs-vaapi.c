@@ -206,22 +206,38 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
 	gst_caps_unref(caps);
 
-	GstElement *vaapipostproc =
-		gst_element_factory_make("vapostproc", NULL);
+	GstElement *vaapipostproc = NULL;
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
 	if (g_str_has_prefix(obs_encoder_get_id(encoder), "obs-va-")) {
+		gchar **fields =
+			g_regex_split_simple("obs-va-va(renderD\\d+).*",
+					     obs_encoder_get_id(encoder), 0, 0);
+
+		if (fields[1] != NULL) {
+			gchar *tmp = g_strdup_printf("va%spostproc", fields[1]);
+			vaapipostproc = gst_element_factory_make(tmp, NULL);
+			g_free(tmp);
+		} else {
+			vaapipostproc =
+				gst_element_factory_make("vapostproc", NULL);
+		}
+
+		g_strfreev(fields);
+
+		vaapipostproc = gst_element_factory_make("vapostproc", NULL);
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
 	} else if (g_str_has_prefix(obs_encoder_get_id(encoder),
 				    "obs-vaapi-")) {
+		g_setenv("GST_VAAPI_DRM_DEVICE",
+			 obs_data_get_string(settings, "device"), TRUE);
+
+		vaapipostproc = gst_element_factory_make("vapostproc", NULL);
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-vaapi-"),
 			NULL);
-
-		g_setenv("GST_VAAPI_DRM_DEVICE",
-			 obs_data_get_string(settings, "device"), TRUE);
 	}
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
@@ -860,7 +876,8 @@ MODULE_EXPORT bool obs_module_load(void)
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-va-%s",
 				gst_plugin_feature_get_name(feature));
-			g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
+			g_hash_table_insert(hash_table, vaapi.type_data,
+					    vaapi.type_data);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-va-"));
@@ -892,7 +909,8 @@ MODULE_EXPORT bool obs_module_load(void)
 			vaapi.id = vaapi.type_data = g_strdup_printf(
 				"obs-vaapi-%s",
 				gst_plugin_feature_get_name(feature));
-			g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
+			g_hash_table_insert(hash_table, vaapi.type_data,
+					    vaapi.type_data);
 			obs_register_encoder(&vaapi);
 			blog(LOG_INFO, "[obs-vaapi] found %s",
 			     vaapi.id + strlen("obs-vaapi-"));

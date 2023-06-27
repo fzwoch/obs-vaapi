@@ -226,7 +226,6 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		g_strfreev(fields);
 
-		vaapipostproc = gst_element_factory_make("vapostproc", NULL);
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
 	} else if (g_str_has_prefix(obs_encoder_get_id(encoder),

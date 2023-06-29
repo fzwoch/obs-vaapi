@@ -129,7 +129,7 @@ static const char *get_name(void *type_data)
 {
 	gchar **fields = g_regex_split_simple(
 		"(obs-va-va|obs-vaapi-vaapi)(renderD\\d+)?(h264|h265|av1)(lp)?enc",
-		type_data, G_REGEX_DEFAULT, G_REGEX_MATCH_DEFAULT);
+		type_data, 0, 0);
 
 	gchar *devname = NULL;
 
@@ -257,10 +257,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *parser = NULL;
 
 	if (g_str_has_prefix(obs_encoder_get_id(encoder), "obs-va-")) {
-		gchar **fields = g_regex_split_simple(
-			"obs-va-va(renderD\\d+)?.*",
-			obs_encoder_get_id(encoder), G_REGEX_DEFAULT,
-			G_REGEX_MATCH_DEFAULT);
+		gchar **fields =
+			g_regex_split_simple("obs-va-va(renderD\\d+)?.*",
+					     obs_encoder_get_id(encoder), 0, 0);
 
 		gchar *tmp = g_strdup_printf("va%spostproc", fields[1]);
 		g_strfreev(fields);
@@ -879,8 +878,7 @@ MODULE_EXPORT bool obs_module_load(void)
 
 		gchar **fields = g_regex_split_simple(
 			"va(renderD\\d+)?(h264|h265|av1)(lp)?enc",
-			gst_plugin_feature_get_name(feature), G_REGEX_DEFAULT,
-			G_REGEX_MATCH_DEFAULT);
+			gst_plugin_feature_get_name(feature), 0, 0);
 		if (g_strcmp0(fields[0], "") != 0) {
 			g_strfreev(fields);
 			continue;
@@ -915,8 +913,7 @@ MODULE_EXPORT bool obs_module_load(void)
 
 		gchar **fields = g_regex_split_simple(
 			"vaapi(h264|h265)enc",
-			gst_plugin_feature_get_name(feature), G_REGEX_DEFAULT,
-			G_REGEX_MATCH_DEFAULT);
+			gst_plugin_feature_get_name(feature), 0, 0);
 		if (g_strcmp0(fields[0], "") != 0) {
 			g_strfreev(fields);
 			continue;

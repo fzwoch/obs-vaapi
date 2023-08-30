@@ -9,7 +9,7 @@ jobs:
       - name: Build x86_64
         run: |
           meson setup --buildtype=release x86_64 -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc'
-          meson build -C x86_64
+          meson compile -C x86_64
       - name: Generate aarch64 cross file
         run: |
           echo "[binaries]" > aarch64.txt
@@ -25,7 +25,7 @@ jobs:
       - name: Build aarch64
         run: |
           meson setup --cross-file=aarch64.txt --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' aarch64
-          meson build -C aarch64
+          meson compile -C aarch64
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:

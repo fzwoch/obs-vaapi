@@ -1,0 +1,35 @@
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/fzwoch/obs-vaapi
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Build x86_64
+        run: |
+          meson setup --buildtype=release x86_64 -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc'
+          meson build -C x86_64
+      - name: Generate aarch64 cross file
+        run: |
+          echo "[binaries]" > aarch64.txt
+          echo "c = 'aarch64-linux-gnu-gcc'" >> aarch64.txt
+          echo "strip = 'aarch64-linux-gnu-strip'" >> aarch64.txt
+          echo "pkgconfig = 'aarch64-linux-gnu-pkg-config'" >> aarch64.txt
+          echo "" >> aarch64.txt
+          echo "[host_machine]" >> aarch64.txt
+          echo "system = 'linux'" >> aarch64.txt
+          echo "cpu_family = 'aarch64'" >> aarch64.txt
+          echo "cpu = 'aarch64'" >> aarch64.txt
+          echo "endian = 'little'" >> aarch64.txt
+      - name: Build aarch64
+        run: |
+          meson setup --cross-file=aarch64.txt --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' aarch64
+          meson build -C aarch64
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: obs-vaapi
+          path: |
+            x86_64/*.so
+            aarch64/*.so

@@ -8,7 +8,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Build x86_64
         run: |
-          meson setup --buildtype=release x86_64 -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc'
+          meson setup --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' x86_64
           meson compile -C x86_64
       - name: Generate aarch64 cross file
         run: |

@@ -649,7 +649,7 @@ static void populate_devices(obs_property_t *prop)
 		char device[1024] = {};
 		int domain, bus, dev, fun;
 
-		sscanf(list[i]->d_name, "%*[^-]%x:%x:%x.%x%*s", &domain, &bus,
+		sscanf(list[i]->d_name, "%*[^-]-%x:%x:%x.%x%*s", &domain, &bus,
 		       &dev, &fun);
 
 		struct pci_dev *pci_dev =

@@ -269,7 +269,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
-	} else {
+	} else if (g_str_has_prefix(obs_encoder_get_id(encoder),
+				    "obs-vaapi-")) {
 		g_setenv("GST_VAAPI_DRM_DEVICE",
 			 obs_data_get_string(settings, "device"), TRUE);
 
@@ -533,7 +534,7 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	if (g_str_has_prefix(type_data, "obs-va-")) {
 		encoder = gst_element_factory_make(
 			type_data + strlen("obs-va-"), NULL);
-	} else {
+	} else if (g_str_has_prefix(type_data, "obs-vaapi-")) {
 		encoder = gst_element_factory_make(
 			type_data + strlen("obs-vaapi-"), NULL);
 
@@ -699,7 +700,7 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 	if (g_str_has_prefix(type_data, "obs-va-")) {
 		encoder = gst_element_factory_make(
 			type_data + strlen("obs-va-"), NULL);
-	} else {
+	} else if (g_str_has_prefix(type_data, "obs-vaapi-")) {
 		encoder = gst_element_factory_make(
 			type_data + strlen("obs-vaapi-"), NULL);
 

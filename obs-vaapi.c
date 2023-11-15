@@ -322,8 +322,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		const char *name = obs_property_name(property);
 		switch (obs_property_get_type(property)) {
 		case OBS_PROPERTY_TEXT:
-			g_object_set(vaapiencoder, name,
-				     obs_data_get_string(settings, name), NULL);
+			gst_util_set_object_arg(G_OBJECT(vaapiencoder), name,
+						obs_data_get_string(settings,
+								    name));
 			blog(LOG_INFO, "[obs-vaapi] %s: %s", name,
 			     obs_data_get_string(settings, name));
 			break;
@@ -622,6 +623,16 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 				}
 			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
 				// not implemented
+			} else if (G_VALUE_TYPE(&value) == GST_TYPE_STRUCTURE) {
+				const GstStructure *s =
+					gst_value_get_structure(&value);
+				if (s != NULL) {
+					gchar *str = gst_structure_serialize(
+						s, GST_SERIALIZE_FLAG_NONE);
+					obs_data_set_default_string(
+						settings, param->name, str);
+					g_free(str);
+				}
 			} else {
 				blog(LOG_WARNING,
 				     "[obs-vaapi] unhandled property: %s",
@@ -811,6 +822,14 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 					g_param_spec_get_blurb(param));
 			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
 				// not implemented
+			} else if (G_VALUE_TYPE(&value) == GST_TYPE_STRUCTURE) {
+				property = obs_properties_add_text(
+					properties, param->name, param->name,
+					OBS_TEXT_DEFAULT);
+				obs_property_set_long_description(
+					property,
+					g_param_spec_get_blurb(param));
+				break;
 			} else {
 				blog(LOG_WARNING,
 				     "[obs-vaapi] unhandled property: %s",

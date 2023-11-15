@@ -622,7 +622,9 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 					}
 				}
 			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
-				// not implemented
+				obs_data_set_default_string(
+					settings, param->name,
+					gst_value_serialize(&value));
 			} else if (G_VALUE_TYPE(&value) == GST_TYPE_STRUCTURE) {
 				const GstStructure *s =
 					gst_value_get_structure(&value);
@@ -821,7 +823,12 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 					property,
 					g_param_spec_get_blurb(param));
 			} else if (GST_IS_PARAM_SPEC_ARRAY_LIST(param)) {
-				// not implemented
+				property = obs_properties_add_text(
+					properties, param->name, param->name,
+					OBS_TEXT_DEFAULT);
+				obs_property_set_long_description(
+					property,
+					g_param_spec_get_blurb(param));
 			} else if (G_VALUE_TYPE(&value) == GST_TYPE_STRUCTURE) {
 				property = obs_properties_add_text(
 					properties, param->name, param->name,
@@ -829,7 +836,6 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 				obs_property_set_long_description(
 					property,
 					g_param_spec_get_blurb(param));
-				break;
 			} else {
 				blog(LOG_WARNING,
 				     "[obs-vaapi] unhandled property: %s",

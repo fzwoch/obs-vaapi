@@ -278,6 +278,18 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-vaapi-"),
 			NULL);
+	} else {
+		//ugh..
+		vaapipostproc = gst_element_factory_make(
+			obs_encoder_get_id(encoder) + strlen("obs-v4l2-"),
+			NULL);
+		vaapiencoder = gst_element_factory_make ("capsfilter", NULL);
+		caps = gst_caps_new_simple("video/x-h264", "level",
+					   G_TYPE_STRING, "4.2",
+					   NULL);
+
+		g_object_set(vaapiencoder, "caps", caps, NULL);
+		gst_caps_unref(caps);
 	}
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
@@ -539,6 +551,9 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 			type_data + strlen("obs-vaapi-"), NULL);
 
 		obs_data_set_default_string(settings, "device", "");
+	} else {
+		encoder = gst_element_factory_make(
+			type_data + strlen("obs-v4l2-"), NULL);
 	}
 
 	guint num_properties;
@@ -713,6 +728,9 @@ static obs_properties_t *get_properties2(void *data, void *type_data)
 
 		obs_property_set_long_description(property,
 						  "Specify DRM device to use");
+	} else {
+		encoder = gst_element_factory_make(
+			type_data + strlen("obs-v4l2-"), NULL);
 	}
 
 	guint num_properties;
@@ -869,6 +887,15 @@ static bool get_extra_data(void *data, uint8_t **extra_data, size_t *size)
 	return true;
 }
 
+static const char *get_name_rpi(void *type_data)
+{
+	if (g_strrstr(type_data, "h264")) {
+		return "Raspberry Pi H.264";
+	} else {
+		return "Raspberry Pi H.265";
+	}
+}
+
 extern const char *obs_vaapi_version;
 
 MODULE_EXPORT bool obs_module_load(void)
@@ -953,6 +980,38 @@ MODULE_EXPORT bool obs_module_load(void)
 
 		vaapi.id = vaapi.type_data = g_strdup_printf(
 			"obs-vaapi-%s", gst_plugin_feature_get_name(feature));
+		g_hash_table_insert(hash_table, vaapi.type_data,
+				    vaapi.type_data);
+		obs_register_encoder(&vaapi);
+		blog(LOG_INFO, "[obs-vaapi] found %s",
+		     gst_plugin_feature_get_name(feature));
+	}
+
+	gst_plugin_feature_list_free(list);
+
+	list = gst_registry_get_feature_list_by_plugin(gst_registry_get(),
+						       "video4linux2");
+
+	for (GList *elem = list; elem != NULL; elem = elem->next) {
+		GstPluginFeature *feature = elem->data;
+
+		gchar **fields = g_regex_split_simple(
+			"v4l2(h264|h265)enc",
+			gst_plugin_feature_get_name(feature), 0, 0);
+		if (g_strcmp0(fields[0], "") != 0) {
+			g_strfreev(fields);
+			continue;
+		}
+		if (g_strcmp0(fields[1], "h264") == 0) {
+			vaapi.codec = "h264";
+		} else {
+			vaapi.codec = "hevc";
+		}
+		g_strfreev(fields);
+		vaapi.get_name = get_name_rpi;
+
+		vaapi.id = vaapi.type_data = g_strdup_printf(
+			"obs-v4l2-%s", gst_plugin_feature_get_name(feature));
 		g_hash_table_insert(hash_table, vaapi.type_data,
 				    vaapi.type_data);
 		obs_register_encoder(&vaapi);

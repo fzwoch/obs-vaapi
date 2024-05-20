@@ -267,6 +267,9 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		vaapipostproc = gst_element_factory_make(tmp, NULL);
 		g_free(tmp);
 
+		gst_util_set_object_arg(G_OBJECT(vaapipostproc), "scale-method",
+					"hq");
+
 		vaapiencoder = gst_element_factory_make(
 			obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
 	} else if (g_str_has_prefix(obs_encoder_get_id(encoder),

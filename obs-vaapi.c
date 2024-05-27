@@ -225,29 +225,42 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	g_object_set(vaapi->appsink, "sync", FALSE, NULL);
 
+	GstVideoColorimetry cinfo;
+
+	cinfo.range = video_info.range == VIDEO_RANGE_FULL
+			      ? GST_VIDEO_COLOR_RANGE_0_255
+			      : GST_VIDEO_COLOR_RANGE_16_235;
+
 	switch (video_info.colorspace) {
 	case VIDEO_CS_601:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt601",
-				    NULL);
+		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_BT601;
+		cinfo.transfer = GST_VIDEO_TRANSFER_BT601;
+		cinfo.primaries = GST_VIDEO_COLOR_PRIMARIES_SMPTE170M;
 		break;
 	default:
 	case VIDEO_CS_709:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "bt709",
-				    NULL);
+		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_BT709;
+		cinfo.transfer = GST_VIDEO_TRANSFER_BT709;
+		cinfo.primaries = GST_VIDEO_COLOR_PRIMARIES_BT709;
 		break;
 	case VIDEO_CS_SRGB:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING, "srgb",
-				    NULL);
+		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_RGB;
+		cinfo.transfer = GST_VIDEO_TRANSFER_SRGB;
+		cinfo.primaries = GST_VIDEO_COLOR_PRIMARIES_BT709;
 		break;
 	case VIDEO_CS_2100_PQ:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
-				    "bt2100_pq", NULL);
+		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_BT2020;
+		cinfo.transfer = GST_VIDEO_TRANSFER_SMPTE2084;
+		cinfo.primaries = GST_VIDEO_COLOR_PRIMARIES_BT2020;
 		break;
 	case VIDEO_CS_2100_HLG:
-		gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
-				    "bt2100_hlg", NULL);
+		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_BT2020;
+		cinfo.transfer = GST_VIDEO_TRANSFER_ARIB_STD_B67;
+		cinfo.primaries = GST_VIDEO_COLOR_PRIMARIES_BT2020;
 		break;
 	}
+	gst_caps_set_simple(caps, "colorimetry", G_TYPE_STRING,
+			    gst_video_colorimetry_to_string(&cinfo), NULL);
 
 	g_object_set(vaapi->appsrc, "caps", caps, NULL);
 	gst_caps_unref(caps);

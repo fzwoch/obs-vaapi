@@ -382,10 +382,12 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_bus_add_watch(bus, bus_callback, NULL);
 	gst_object_unref(bus);
 
-	blog(LOG_INFO, "[obs-vaapi] codec: %s, %dx%d@%d/%d, format: %d ",
+	blog(LOG_INFO, "[obs-vaapi] codec: %s, %dx%d@%d/%d, format: %s ",
 	     obs_encoder_get_id(encoder), obs_encoder_get_width(encoder),
 	     obs_encoder_get_height(encoder), video_info.fps_num,
-	     video_info.fps_den, video_info.output_format);
+	     video_info.fps_den,
+	     gst_video_format_to_string(
+		     (GstVideoFormat)video_info.output_format));
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 

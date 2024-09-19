@@ -43,6 +43,26 @@ typedef struct {
 	size_t codec_size;
 } obs_vaapi_t;
 
+static GstVideoFormat map_video_format(enum video_format format)
+{
+	switch (format) {
+	case VIDEO_FORMAT_I420:
+		return GST_VIDEO_FORMAT_I420;
+	case VIDEO_FORMAT_NV12:
+		return GST_VIDEO_FORMAT_NV12;
+	case VIDEO_FORMAT_I444:
+		return GST_VIDEO_FORMAT_Y444;
+	case VIDEO_FORMAT_BGRA:
+		return GST_VIDEO_FORMAT_BGRx;
+	case VIDEO_FORMAT_P010:
+		return GST_VIDEO_FORMAT_P010_10LE;
+	case VIDEO_FORMAT_I010:
+		return GST_VIDEO_FORMAT_I420_10LE;
+	default:
+		return GST_VIDEO_FORMAT_UNKNOWN;
+	}
+}
+
 static gboolean bus_callback(GstBus *bus, GstMessage *message,
 			     gpointer user_data)
 {
@@ -387,7 +407,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	     obs_encoder_get_height(encoder), video_info.fps_num,
 	     video_info.fps_den,
 	     gst_video_format_to_string(
-		     (GstVideoFormat)video_info.output_format));
+		     map_video_format(video_info.output_format)));
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 

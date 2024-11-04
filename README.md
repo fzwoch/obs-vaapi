@@ -1,6 +1,6 @@
 # OBS VAAPI
 
-[GStreamer] based VAAPI encoder implementation. Taken out of the [GStreamer OBS plugin] as a standalone plugin. Simply because the FFMPEG VAAPI implementation shows performance bottlenecks on some AMD hardware. \[2024: OBS's FFMPEG VAAPI encoder now supports texture sharing, so it should be the better choice performasnce wise.\]
+[GStreamer] based VAAPI encoder implementation. Taken out of the [GStreamer OBS plugin] as a standalone plugin. Simply because the FFMPEG VAAPI implementation shows performance bottlenecks on some AMD hardware. \[2024: OBS's FFMPEG VAAPI encoder now supports texture sharing, so it should be the better choice performance wise.\]
 
 Supports H.264, H.265 and AV1.
 

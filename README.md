@@ -15,6 +15,10 @@ One option is to copy the plugin to the current user's OBS plugin directory:
 
 `~/.config/obs-studio/plugins/obs-vaapi/bin/64bit/obs-vaapi.so`
 
+For Flatpak use:
+
+`flatpak install com.obsproject.Studio.Plugin.GstreamerVaapi`
+
 ## Checklist
 
 1. Check VAAPI is working. You are looking for `VAEntrypointEncSlice` entry points.

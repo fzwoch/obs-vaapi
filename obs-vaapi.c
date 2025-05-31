@@ -142,23 +142,15 @@ static gchar *get_device_name(gchar *device_name)
 
 static const char *get_name(void *type_data)
 {
-	gchar **fields = g_regex_split_simple("(obs-va-va|obs-vaapi-vaapi)(renderD\\d+)?(h264|h265|av1)(lp)?enc",
-					      type_data, 0, 0);
+	gchar **fields = g_regex_split_simple("(obs-va-va)(renderD\\d+)?(h264|h265|av1)(lp)?enc", type_data, 0, 0);
 
-	gchar *devname = NULL;
+	gchar *devname = get_device_name(g_strcmp0(fields[2], "") == 0 ? "renderD128" : fields[2]);
 
-	if (g_strcmp0(fields[1], "obs-va-va") == 0) {
-		devname = get_device_name(g_strcmp0(fields[2], "") == 0 ? "renderD128" : fields[2]);
-	}
-
-	gchar *name = g_strdup_printf("VAAPI %s %s%s%s%s",
+	gchar *name = g_strdup_printf("VAAPI %s on %s%s",
 				      g_strcmp0(fields[3], "h264") == 0   ? "H.264"
 				      : g_strcmp0(fields[3], "h265") == 0 ? "H.265"
 									  : "AV1",
-				      g_strcmp0(fields[1], "obs-va-va") == 0 ? "on " : "",
-				      g_strcmp0(fields[1], "obs-vaapi-vaapi") == 0 ? "" : devname,
-				      g_strcmp0(fields[4], "lp") == 0 ? " (Low Power)" : "",
-				      g_strcmp0(fields[1], "obs-vaapi-vaapi") == 0 ? " (Legacy)" : "");
+				      devname, g_strcmp0(fields[4], "lp") == 0 ? " (Low Power)" : "");
 
 	g_free(devname);
 	g_strfreev(fields);
@@ -267,24 +259,17 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
-	if (g_str_has_prefix(obs_encoder_get_id(encoder), "obs-va-")) {
-		gchar **fields = g_regex_split_simple("obs-va-va(renderD\\d+)?.*", obs_encoder_get_id(encoder), 0, 0);
+	gchar **fields = g_regex_split_simple("obs-va-va(renderD\\d+)?.*", obs_encoder_get_id(encoder), 0, 0);
 
-		gchar *tmp = g_strdup_printf("va%spostproc", fields[1]);
-		g_strfreev(fields);
+	gchar *tmp = g_strdup_printf("va%spostproc", fields[1]);
+	g_strfreev(fields);
 
-		vaapipostproc = gst_element_factory_make(tmp, NULL);
-		g_free(tmp);
+	vaapipostproc = gst_element_factory_make(tmp, NULL);
+	g_free(tmp);
 
-		gst_util_set_object_arg(G_OBJECT(vaapipostproc), "scale-method", "hq");
+	gst_util_set_object_arg(G_OBJECT(vaapipostproc), "scale-method", "hq");
 
-		vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
-	} else if (g_str_has_prefix(obs_encoder_get_id(encoder), "obs-vaapi-")) {
-		g_setenv("GST_VAAPI_DRM_DEVICE", obs_data_get_string(settings, "device"), TRUE);
-
-		vaapipostproc = gst_element_factory_make("vaapipostproc", NULL);
-		vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen("obs-vaapi-"), NULL);
-	}
+	vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		parser = gst_element_factory_make("h264parse", NULL);
@@ -498,15 +483,7 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 
 static void get_defaults2(obs_data_t *settings, void *type_data)
 {
-	GstElement *encoder = NULL;
-
-	if (g_str_has_prefix(type_data, "obs-va-")) {
-		encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
-	} else if (g_str_has_prefix(type_data, "obs-vaapi-")) {
-		encoder = gst_element_factory_make(type_data + strlen("obs-vaapi-"), NULL);
-
-		obs_data_set_default_string(settings, "device", "");
-	}
+	GstElement *encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(G_OBJECT_GET_CLASS(encoder), &num_properties);
@@ -599,62 +576,12 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 	gst_object_unref(encoder);
 }
 
-static void populate_devices(obs_property_t *prop)
-{
-	struct dirent **list;
-	int n = scandir("/dev/dri/by-path/", &list, scanfilter, versionsort);
-
-	obs_property_list_add_string(prop, "Default", "");
-
-	struct pci_access *pci = pci_alloc();
-	pci_init(pci);
-
-	for (int i = 0; i < n; i++) {
-		char device[1024] = {};
-		int domain, bus, dev, fun;
-
-		sscanf(list[i]->d_name, "%*[^-]-%x:%x:%x.%x%*s", &domain, &bus, &dev, &fun);
-
-		struct pci_dev *pci_dev = pci_get_dev(pci, domain, bus, dev, fun);
-		if (pci_dev == NULL) {
-			obs_property_list_add_string(prop, list[i]->d_name, list[i]->d_name);
-			continue;
-		}
-
-		pci_fill_info(pci_dev, PCI_FILL_IDENT);
-		pci_lookup_name(pci, device, sizeof(device), PCI_LOOKUP_DEVICE, pci_dev->vendor_id, pci_dev->device_id);
-		pci_free_dev(pci_dev);
-
-		obs_property_list_add_string(prop, device, list[i]->d_name);
-	}
-
-	pci_cleanup(pci);
-
-	while (n--) {
-		free(list[n]);
-	}
-	free(list);
-}
-
 static obs_properties_t *get_properties2(void *data, void *type_data)
 {
-	GstElement *encoder = NULL;
+	GstElement *encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
 	obs_property_t *property = NULL;
 
 	obs_properties_t *properties = obs_properties_create();
-
-	if (g_str_has_prefix(type_data, "obs-va-")) {
-		encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
-	} else if (g_str_has_prefix(type_data, "obs-vaapi-")) {
-		encoder = gst_element_factory_make(type_data + strlen("obs-vaapi-"), NULL);
-
-		property = obs_properties_add_list(properties, "device", "device", OBS_COMBO_TYPE_LIST,
-						   OBS_COMBO_FORMAT_STRING);
-
-		populate_devices(property);
-
-		obs_property_set_long_description(property, "Specify DRM device to use");
-	}
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(G_OBJECT_GET_CLASS(encoder), &num_properties);
@@ -813,34 +740,6 @@ MODULE_EXPORT bool obs_module_load(void)
 		g_strfreev(fields);
 
 		vaapi.id = vaapi.type_data = g_strdup_printf("obs-va-%s", gst_plugin_feature_get_name(feature));
-		g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
-		obs_register_encoder(&vaapi);
-		blog(LOG_INFO, "[obs-vaapi] found %s", gst_plugin_feature_get_name(feature));
-	}
-
-	gst_plugin_feature_list_free(list);
-
-	//	vaapi.caps = OBS_ENCODER_CAP_DEPRECATED;
-
-	list = gst_registry_get_feature_list_by_plugin(gst_registry_get(), "vaapi");
-
-	for (GList *elem = list; elem != NULL; elem = elem->next) {
-		GstPluginFeature *feature = elem->data;
-
-		gchar **fields =
-			g_regex_split_simple("vaapi(h264|h265)enc", gst_plugin_feature_get_name(feature), 0, 0);
-		if (g_strcmp0(fields[0], "") != 0) {
-			g_strfreev(fields);
-			continue;
-		}
-		if (g_strcmp0(fields[1], "h264") == 0) {
-			vaapi.codec = "h264";
-		} else {
-			vaapi.codec = "hevc";
-		}
-		g_strfreev(fields);
-
-		vaapi.id = vaapi.type_data = g_strdup_printf("obs-vaapi-%s", gst_plugin_feature_get_name(feature));
 		g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
 		obs_register_encoder(&vaapi);
 		blog(LOG_INFO, "[obs-vaapi] found %s", gst_plugin_feature_get_name(feature));

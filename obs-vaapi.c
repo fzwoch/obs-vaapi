@@ -164,6 +164,45 @@ static const char *get_name(void *type_data)
 	return name;
 }
 
+struct Probe {
+	GstPad *pad;
+	GstPadProbeInfo *info;
+};
+
+static void enum_roi(void *user_data, struct obs_encoder_roi *roi)
+{
+	struct Probe *probe = user_data;
+
+	GstBuffer *buffer = gst_pad_probe_info_get_buffer(probe->info);
+	GstCaps *caps = gst_pad_get_current_caps(probe->pad);
+
+	GstVideoInfo vinfo = {};
+	gst_video_info_from_caps(&vinfo, caps);
+	gint width = GST_VIDEO_INFO_WIDTH(&vinfo);
+	gint height = GST_VIDEO_INFO_HEIGHT(&vinfo);
+
+	GstVideoRegionOfInterestMeta *roi_meta = gst_buffer_add_video_region_of_interest_meta(
+		buffer, "face", roi->left, roi->top, width - roi->right, height - roi->bottom);
+	gst_video_region_of_interest_meta_add_param(roi_meta, gst_structure_new("extra", "confidence", G_TYPE_FLOAT,
+										roi->priority, NULL));
+}
+
+static GstPadProbeReturn pad_probe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
+{
+	obs_vaapi_t *vaapi = user_data;
+
+	if (obs_encoder_has_roi(vaapi->encoder)) {
+		struct Probe probe = {
+			.pad = pad,
+			.info = info,
+		};
+
+		obs_encoder_enum_roi(vaapi->encoder, enum_roi, &probe);
+	}
+
+	return GST_PAD_PROBE_OK;
+}
+
 static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	obs_vaapi_t *vaapi = bzalloc(sizeof(obs_vaapi_t));
@@ -331,6 +370,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		}
 	}
 	obs_properties_destroy(properties);
+
+	GstPad *pad = gst_element_get_static_pad(vaapiencoder, "sink");
+	gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, pad_probe, vaapi, NULL);
+	gst_object_unref(pad);
 
 	GstBus *bus = gst_element_get_bus(vaapi->pipe);
 	gst_bus_add_watch(bus, bus_callback, NULL);
@@ -717,7 +760,7 @@ MODULE_EXPORT bool obs_module_load(void)
 		.get_properties2 = get_properties2,
 		.encode = encode,
 		.get_extra_data = get_extra_data,
-		.caps = OBS_ENCODER_CAP_SCALING,
+		.caps = OBS_ENCODER_CAP_SCALING | OBS_ENCODER_CAP_ROI,
 	};
 
 	GList *list = gst_registry_get_feature_list_by_plugin(gst_registry_get(), "va");

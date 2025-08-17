@@ -717,6 +717,7 @@ MODULE_EXPORT bool obs_module_load(void)
 		.get_properties2 = get_properties2,
 		.encode = encode,
 		.get_extra_data = get_extra_data,
+		.caps = OBS_ENCODER_CAP_SCALING,
 	};
 
 	GList *list = gst_registry_get_feature_list_by_plugin(gst_registry_get(), "va");

@@ -26,8 +26,8 @@ RUN apt update \
     gcc libsimde-dev libgstreamer-plugins-base1.0-dev libpci-dev \
  && rm -rf /var/lib/apt/lists/*
 
-RUN wget https://github.com/obsproject/obs-studio/archive/refs/tags/28.0.0.tar.gz \
- && tar xvf 28.0.0.tar.gz \
- && mv obs-studio-28.0.0 obs \
+RUN wget https://github.com/obsproject/obs-studio/archive/refs/tags/30.1.0.tar.gz \
+ && tar xvf 30.1.0.tar.gz \
+ && mv obs-studio-30.1.0 obs \
  && mv obs/libobs obs/obs \
- && rm 28.0.0.tar.gz
+ && rm 30.1.0.tar.gz

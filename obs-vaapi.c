@@ -41,6 +41,7 @@ typedef struct {
 	GCond cond;
 	void *codec_data;
 	size_t codec_size;
+	struct obs_video_info video_info;
 } obs_vaapi_t;
 
 static GstVideoFormat map_video_format(enum video_format format)
@@ -101,6 +102,10 @@ static gchar *get_device_name(gchar *device_name)
 	int n = scandir("/dev/dri/by-path/", &list, scanfilter, versionsort);
 	gchar *ret = NULL;
 
+	if (n == -1) {
+		return "-- Unknown Name --";
+	}
+
 	struct pci_access *pci = pci_alloc();
 	pci_init(pci);
 
@@ -142,15 +147,15 @@ static gchar *get_device_name(gchar *device_name)
 
 static const char *get_name(void *type_data)
 {
-	gchar **fields = g_regex_split_simple("(obs-va-va)(renderD\\d+)?(h264|h265|av1)(lp)?enc", type_data, 0, 0);
+	gchar **fields = g_regex_split_simple("obs-va-va(renderD\\d+)?(h264|h265|av1)(lp)?enc", type_data, 0, 0);
 
-	gchar *devname = get_device_name(g_strcmp0(fields[2], "") == 0 ? "renderD128" : fields[2]);
+	gchar *devname = get_device_name(g_strcmp0(fields[1], "") == 0 ? "renderD128" : fields[1]);
 
 	gchar *name = g_strdup_printf("VAAPI %s on %s%s",
-				      g_strcmp0(fields[3], "h264") == 0   ? "H.264"
-				      : g_strcmp0(fields[3], "h265") == 0 ? "H.265"
+				      g_strcmp0(fields[2], "h264") == 0   ? "H.264"
+				      : g_strcmp0(fields[2], "h265") == 0 ? "H.265"
 									  : "AV1",
-				      devname, g_strcmp0(fields[4], "lp") == 0 ? " (Low Power)" : "");
+				      devname, g_strcmp0(fields[3], "lp") == 0 ? " (Low Power)" : "");
 
 	g_free(devname);
 	g_strfreev(fields);
@@ -170,15 +175,15 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	vaapi->encoder = encoder;
 
-	struct obs_video_info video_info;
-	obs_get_video_info(&video_info);
+	obs_get_video_info(&vaapi->video_info);
 
-	GstCaps *caps = gst_caps_new_simple("video/x-raw", "framerate", GST_TYPE_FRACTION, video_info.fps_num,
-					    video_info.fps_den, "width", G_TYPE_INT, obs_encoder_get_width(encoder),
-					    "height", G_TYPE_INT, obs_encoder_get_height(encoder), "interlace-mode",
-					    G_TYPE_STRING, "progressive", NULL);
+	GstCaps *caps = gst_caps_new_simple("video/x-raw", "framerate", GST_TYPE_FRACTION, vaapi->video_info.fps_num,
+					    vaapi->video_info.fps_den, "width", G_TYPE_INT,
+					    obs_encoder_get_width(encoder), "height", G_TYPE_INT,
+					    obs_encoder_get_height(encoder), "interlace-mode", G_TYPE_STRING,
+					    "progressive", NULL);
 
-	switch (video_info.output_format) {
+	switch (vaapi->video_info.output_format) {
 	case VIDEO_FORMAT_I420:
 		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420", NULL);
 		break;
@@ -199,7 +204,7 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 		//				    NULL);
 		//		break;
 	default:
-		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", video_info.output_format);
+		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", vaapi->video_info.output_format);
 		gst_caps_unref(caps);
 		return NULL;
 	}
@@ -220,9 +225,10 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	GstVideoColorimetry cinfo;
 
-	cinfo.range = video_info.range == VIDEO_RANGE_FULL ? GST_VIDEO_COLOR_RANGE_0_255 : GST_VIDEO_COLOR_RANGE_16_235;
+	cinfo.range = vaapi->video_info.range == VIDEO_RANGE_FULL ? GST_VIDEO_COLOR_RANGE_0_255
+								  : GST_VIDEO_COLOR_RANGE_16_235;
 
-	switch (video_info.colorspace) {
+	switch (vaapi->video_info.colorspace) {
 	case VIDEO_CS_601:
 		cinfo.matrix = GST_VIDEO_COLOR_MATRIX_BT601;
 		cinfo.transfer = GST_VIDEO_TRANSFER_BT601;
@@ -337,8 +343,8 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	gst_object_unref(bus);
 
 	blog(LOG_INFO, "[obs-vaapi] codec: %s, %dx%d@%d/%d, format: %s ", obs_encoder_get_id(encoder),
-	     obs_encoder_get_width(encoder), obs_encoder_get_height(encoder), video_info.fps_num, video_info.fps_den,
-	     gst_video_format_to_string(map_video_format(video_info.output_format)));
+	     obs_encoder_get_width(encoder), obs_encoder_get_height(encoder), vaapi->video_info.fps_num,
+	     vaapi->video_info.fps_den, gst_video_format_to_string(map_video_format(vaapi->video_info.output_format)));
 
 	gst_element_set_state(vaapi->pipe, GST_STATE_PLAYING);
 
@@ -388,6 +394,8 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 {
 	obs_vaapi_t *vaapi = data;
 
+	*received_packet = false;
+
 	if (vaapi->sample) {
 		GstBuffer *buffer = gst_sample_get_buffer(vaapi->sample);
 		gst_buffer_unmap(buffer, &vaapi->info);
@@ -395,13 +403,10 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 		vaapi->sample = NULL;
 	}
 
-	struct obs_video_info video_info;
-	obs_get_video_info(&video_info);
-
 	GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
 	gsize buffer_size = 0;
 
-	switch (video_info.output_format) {
+	switch (vaapi->video_info.output_format) {
 	case VIDEO_FORMAT_I420:
 		format = GST_VIDEO_FORMAT_I420;
 		buffer_size = obs_encoder_get_width(vaapi->encoder) * obs_encoder_get_height(vaapi->encoder) * 3 / 2;
@@ -427,7 +432,7 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 		buffer_size = obs_encoder_get_width(vaapi->encoder) * obs_encoder_get_height(vaapi->encoder) * 3;
 		break;
 	default:
-		break;
+		return false;
 	}
 
 	GstBuffer *buffer =
@@ -444,14 +449,18 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 
 	g_mutex_lock(&vaapi->mutex);
 
-	gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
+	GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
+	if (ret != GST_FLOW_OK) {
+		gst_buffer_unref(buffer);
+		return false;
+	}
 
 	g_cond_wait(&vaapi->cond, &vaapi->mutex);
 	g_mutex_unlock(&vaapi->mutex);
 
 	vaapi->sample = gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);
 	if (vaapi->sample == NULL) {
-		return true;
+		return false;
 	}
 
 	*received_packet = true;

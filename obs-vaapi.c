@@ -460,7 +460,7 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 
 	vaapi->sample = gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);
 	if (vaapi->sample == NULL) {
-		return false;
+		return true;
 	}
 
 	*received_packet = true;

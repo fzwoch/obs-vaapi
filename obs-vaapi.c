@@ -20,13 +20,23 @@
 
 #define _GNU_SOURCE
 
+#define GST_USE_UNSTABLE_API
+
 #include <gst/app/app.h>
 #include <gst/gst.h>
+#include <gst/va/gstva.h>
 #include <gst/video/video.h>
 #include <obs/obs-module.h>
 #include <pci/pci.h>
 
+#include <drm/drm_fourcc.h>
+#include <unistd.h>
+#include <va/va.h>
+#include <va/va_drmcommon.h>
+
 OBS_DECLARE_MODULE()
+
+#define TEXTURE_PREFIX "obs-va-tex-"
 
 static GHashTable *hash_table;
 
@@ -39,10 +49,31 @@ typedef struct {
 	GstMapInfo info;
 	GMutex mutex;
 	GCond cond;
+	bool consumed;
 	void *codec_data;
 	size_t codec_size;
 	struct obs_video_info video_info;
+	GstVaDisplay *va_display;
+	GstAllocator *va_allocator;
+	GstVideoInfoDmaDrm drm_info;
 } obs_vaapi_t;
+
+static enum gs_color_format drm_to_gs_color_format(uint32_t format)
+{
+	switch (format) {
+	case DRM_FORMAT_R8:
+		return GS_R8;
+	case DRM_FORMAT_R16:
+		return GS_R16;
+	case DRM_FORMAT_GR88:
+		return GS_R8G8;
+	case DRM_FORMAT_GR1616:
+		return GS_RG16;
+	default:
+		blog(LOG_ERROR, "[obs-vaapi] unsupported drm format: %d", format);
+		return GS_UNKNOWN;
+	}
+}
 
 static GstVideoFormat map_video_format(enum video_format format)
 {
@@ -147,15 +178,14 @@ static gchar *get_device_name(gchar *device_name)
 
 static const char *get_name(void *type_data)
 {
-	gchar **fields = g_regex_split_simple("obs-va-va(renderD\\d+)?(h264|h265|av1)(lp)?enc", type_data, 0, 0);
-
-	gchar *devname = get_device_name(g_strcmp0(fields[1], "") == 0 ? "renderD128" : fields[1]);
-
-	gchar *name = g_strdup_printf("VAAPI %s on %s%s",
-				      g_strcmp0(fields[2], "h264") == 0   ? "H.264"
-				      : g_strcmp0(fields[2], "h265") == 0 ? "H.265"
+	gchar **fields = g_regex_split_simple("obs-va-(tex-)?va(renderD\\d+)?(h264|h265|av1)(lp)?enc", type_data, 0, 0);
+	gchar *devname = get_device_name(g_strcmp0(fields[2], "") == 0 ? "renderD128" : fields[2]);
+	gchar *name = g_strdup_printf("VAAPI %s%s on %s%s",
+				      g_strcmp0(fields[3], "h264") == 0   ? "H.264"
+				      : g_strcmp0(fields[3], "h265") == 0 ? "H.265"
 									  : "AV1",
-				      devname, g_strcmp0(fields[3], "lp") == 0 ? " (Low Power)" : "");
+				      g_strcmp0(fields[1], "tex-") == 0 ? " (Texture)" : "", devname,
+				      g_strcmp0(fields[4], "lp") == 0 ? " (Low Power)" : "");
 
 	g_free(devname);
 	g_strfreev(fields);
@@ -169,6 +199,94 @@ static const char *get_name(void *type_data)
 	return name;
 }
 
+static gchar *get_device_suffix(const char *encoder_id)
+{
+	gchar **fields = g_regex_split_simple("obs-va-(?:tex-)?va(renderD\\d+)?.*", encoder_id, 0, 0);
+	gchar *suffix = g_strdup(fields[1] != NULL ? fields[1] : "");
+
+	g_strfreev(fields);
+
+	return suffix;
+}
+
+static gchar *get_device_path(const char *encoder_id)
+{
+	gchar *suffix = get_device_suffix(encoder_id);
+	gchar *path = g_strdup_printf("/dev/dri/%s", *suffix == '\0' ? "renderD128" : suffix);
+
+	g_free(suffix);
+
+	return path;
+}
+
+static gchar *get_postproc_name(const char *encoder_id)
+{
+	gchar *suffix = get_device_suffix(encoder_id);
+	gchar *name = g_strdup_printf("va%spostproc", suffix);
+
+	g_free(suffix);
+
+	return name;
+}
+
+static bool setup_texture(obs_vaapi_t *vaapi)
+{
+	video_t *video = obs_encoder_video(vaapi->encoder);
+	if (video == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] encoder has no video");
+		return false;
+	}
+
+	const struct video_output_info *voi = video_output_get_info(video);
+
+	GstVideoFormat format;
+
+	switch (voi->format) {
+	case VIDEO_FORMAT_NV12:
+		format = GST_VIDEO_FORMAT_NV12;
+		break;
+	case VIDEO_FORMAT_P010:
+		format = GST_VIDEO_FORMAT_P010_10LE;
+		break;
+	default:
+		blog(LOG_ERROR, "[obs-vaapi] unsupported texture format: %d", voi->format);
+		return false;
+	}
+
+	gchar *device = get_device_path(obs_encoder_get_id(vaapi->encoder));
+
+	vaapi->va_display = gst_va_display_drm_new_from_path(device);
+	g_free(device);
+	if (vaapi->va_display == NULL) {
+		blog(LOG_ERROR, "[obs-vaapi] failed to open VA display");
+		return false;
+	}
+
+	guint usage_hint = VA_SURFACE_ATTRIB_USAGE_HINT_VPP_READ | VA_SURFACE_ATTRIB_USAGE_HINT_VPP_WRITE;
+
+	gst_video_info_dma_drm_init(&vaapi->drm_info);
+	gst_video_info_set_format(&vaapi->drm_info.vinfo, format, obs_encoder_get_width(vaapi->encoder),
+				  obs_encoder_get_height(vaapi->encoder));
+	GST_VIDEO_INFO_FPS_N(&vaapi->drm_info.vinfo) = vaapi->video_info.fps_num;
+	GST_VIDEO_INFO_FPS_D(&vaapi->drm_info.vinfo) = vaapi->video_info.fps_den;
+
+	vaapi->drm_info.drm_fourcc = gst_video_dma_drm_fourcc_from_format(format);
+	vaapi->drm_info.drm_modifier = gst_va_dmabuf_get_modifier_for_format(vaapi->va_display, format, usage_hint);
+	if (vaapi->drm_info.drm_modifier == DRM_FORMAT_MOD_INVALID) {
+		blog(LOG_ERROR, "[obs-vaapi] failed to query dmabuf modifier");
+		return false;
+	}
+
+	vaapi->va_allocator = gst_va_dmabuf_allocator_new(vaapi->va_display);
+	if (vaapi->va_allocator == NULL ||
+	    !gst_va_dmabuf_allocator_set_format(vaapi->va_allocator, &vaapi->drm_info, usage_hint)) {
+		blog(LOG_ERROR, "[obs-vaapi] failed to set up dmabuf allocator");
+		return false;
+	}
+
+	return true;
+}
+
 static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	obs_vaapi_t *vaapi = bzalloc(sizeof(obs_vaapi_t));
@@ -177,36 +295,52 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 
 	obs_get_video_info(&vaapi->video_info);
 
-	GstCaps *caps = gst_caps_new_simple("video/x-raw", "framerate", GST_TYPE_FRACTION, vaapi->video_info.fps_num,
-					    vaapi->video_info.fps_den, "width", G_TYPE_INT,
-					    obs_encoder_get_width(encoder), "height", G_TYPE_INT,
-					    obs_encoder_get_height(encoder), "interlace-mode", G_TYPE_STRING,
-					    "progressive", NULL);
+	gboolean texture = g_str_has_prefix(obs_encoder_get_id(encoder), TEXTURE_PREFIX);
 
-	switch (vaapi->video_info.output_format) {
-	case VIDEO_FORMAT_I420:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420", NULL);
-		break;
-	case VIDEO_FORMAT_NV12:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12", NULL);
-		break;
-	case VIDEO_FORMAT_I444:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "Y444", NULL);
-		break;
-	case VIDEO_FORMAT_BGRA:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "BGRx", NULL);
-		break;
-	case VIDEO_FORMAT_P010:
-		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE", NULL);
-		break;
-		//	case VIDEO_FORMAT_I010:
-		//		gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420_10LE",
-		//				    NULL);
-		//		break;
-	default:
-		blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", vaapi->video_info.output_format);
-		gst_caps_unref(caps);
-		return NULL;
+	GstCaps *caps = NULL;
+
+	if (texture) {
+		if (!setup_texture(vaapi)) {
+			if (vaapi->va_allocator) {
+				gst_object_unref(vaapi->va_allocator);
+			}
+			if (vaapi->va_display) {
+				gst_object_unref(vaapi->va_display);
+			}
+			bfree(vaapi);
+			return NULL;
+		}
+
+		caps = gst_video_info_dma_drm_to_caps(&vaapi->drm_info);
+	} else {
+		caps = gst_caps_new_simple("video/x-raw", "framerate", GST_TYPE_FRACTION, vaapi->video_info.fps_num,
+					   vaapi->video_info.fps_den, "width", G_TYPE_INT,
+					   obs_encoder_get_width(encoder), "height", G_TYPE_INT,
+					   obs_encoder_get_height(encoder), "interlace-mode", G_TYPE_STRING,
+					   "progressive", NULL);
+
+		switch (vaapi->video_info.output_format) {
+		case VIDEO_FORMAT_I420:
+			gst_caps_set_simple(caps, "format", G_TYPE_STRING, "I420", NULL);
+			break;
+		case VIDEO_FORMAT_NV12:
+			gst_caps_set_simple(caps, "format", G_TYPE_STRING, "NV12", NULL);
+			break;
+		case VIDEO_FORMAT_I444:
+			gst_caps_set_simple(caps, "format", G_TYPE_STRING, "Y444", NULL);
+			break;
+		case VIDEO_FORMAT_BGRA:
+			gst_caps_set_simple(caps, "format", G_TYPE_STRING, "BGRx", NULL);
+			break;
+		case VIDEO_FORMAT_P010:
+			gst_caps_set_simple(caps, "format", G_TYPE_STRING, "P010_10LE", NULL);
+			break;
+		default:
+			blog(LOG_ERROR, "[obs-vaapi] unsupported color format: %d", vaapi->video_info.output_format);
+			gst_caps_unref(caps);
+			bfree(vaapi);
+			return NULL;
+		}
 	}
 
 	vaapi->pipe = gst_pipeline_new(NULL);
@@ -265,17 +399,22 @@ static void *create(obs_data_t *settings, obs_encoder_t *encoder)
 	GstElement *vaapiencoder = NULL;
 	GstElement *parser = NULL;
 
-	gchar **fields = g_regex_split_simple("obs-va-va(renderD\\d+)?.*", obs_encoder_get_id(encoder), 0, 0);
+	gchar *postproc_name = get_postproc_name(obs_encoder_get_id(encoder));
 
-	gchar *tmp = g_strdup_printf("va%spostproc", fields[1]);
-	g_strfreev(fields);
+	vaapipostproc = gst_element_factory_make(postproc_name, NULL);
+	g_free(postproc_name);
 
-	vaapipostproc = gst_element_factory_make(tmp, NULL);
-	g_free(tmp);
+	if (texture) {
+		vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen(TEXTURE_PREFIX), NULL);
+	} else {
+		vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
+	}
 
 	gst_util_set_object_arg(G_OBJECT(vaapipostproc), "scale-method", "hq");
 
-	vaapiencoder = gst_element_factory_make(obs_encoder_get_id(encoder) + strlen("obs-va-"), NULL);
+	if (texture) {
+		g_object_set(vaapipostproc, "disable-passthrough", TRUE, NULL);
+	}
 
 	if (g_strcmp0(obs_encoder_get_codec(encoder), "h264") == 0) {
 		parser = gst_element_factory_make("h264parse", NULL);
@@ -374,6 +513,13 @@ static void destroy(void *data)
 		gst_sample_unref(vaapi->sample);
 	}
 
+	if (vaapi->va_allocator) {
+		gst_object_unref(vaapi->va_allocator);
+	}
+	if (vaapi->va_display) {
+		gst_object_unref(vaapi->va_display);
+	}
+
 	g_mutex_clear(&vaapi->mutex);
 	g_cond_clear(&vaapi->cond);
 
@@ -386,8 +532,137 @@ static void destroy_notify(void *data)
 	obs_vaapi_t *vaapi = data;
 
 	g_mutex_lock(&vaapi->mutex);
+	vaapi->consumed = true;
 	g_cond_signal(&vaapi->cond);
 	g_mutex_unlock(&vaapi->mutex);
+}
+
+static void buffer_destroy_notify(gpointer data, GstMiniObject *object)
+{
+	UNUSED_PARAMETER(object);
+
+	destroy_notify(data);
+}
+
+static void release_sample(obs_vaapi_t *vaapi)
+{
+	if (vaapi->sample) {
+		GstBuffer *buffer = gst_sample_get_buffer(vaapi->sample);
+		gst_buffer_unmap(buffer, &vaapi->info);
+		gst_sample_unref(vaapi->sample);
+		vaapi->sample = NULL;
+	}
+}
+
+static bool copy_texture(obs_vaapi_t *vaapi, GstBuffer *buffer, struct encoder_texture *texture)
+{
+	VASurfaceID surface = gst_va_buffer_get_surface(buffer);
+	VADisplay display = gst_va_display_get_va_dpy(vaapi->va_display);
+	VADRMPRIMESurfaceDescriptor desc = {0};
+
+	if (surface == VA_INVALID_ID) {
+		blog(LOG_ERROR, "[obs-vaapi] buffer has no VA surface");
+		return false;
+	}
+
+	VAStatus status = vaExportSurfaceHandle(display, surface, VA_SURFACE_ATTRIB_MEM_TYPE_DRM_PRIME_2,
+						VA_EXPORT_SURFACE_SEPARATE_LAYERS | VA_EXPORT_SURFACE_READ_WRITE,
+						&desc);
+	if (status != VA_STATUS_SUCCESS) {
+		blog(LOG_ERROR, "[obs-vaapi] failed to export VA surface: %s", vaErrorStr(status));
+		return false;
+	}
+
+	bool ok = true;
+
+	for (guint32 i = 0; i < desc.num_layers && ok; i++) {
+		if (texture->tex[i] == NULL) {
+			blog(LOG_ERROR, "[obs-vaapi] unexpected number of textures");
+			ok = false;
+			break;
+		}
+
+		uint32_t width = desc.width;
+		uint32_t height = desc.height;
+
+		if (i) {
+			width /= 2;
+			height /= 2;
+		}
+
+		uint32_t object = desc.layers[i].object_index[0];
+		int fd = desc.objects[object].fd;
+		uint32_t stride = desc.layers[i].pitch[0];
+		uint32_t offset = desc.layers[i].offset[0];
+		uint64_t modifier = desc.objects[object].drm_format_modifier;
+
+		gs_texture_t *tex = gs_texture_create_from_dmabuf(width, height, desc.layers[i].drm_format,
+								  drm_to_gs_color_format(desc.layers[i].drm_format), 1,
+								  &fd, &stride, &offset, &modifier);
+		if (tex == NULL) {
+			blog(LOG_ERROR, "[obs-vaapi] failed to import dmabuf plane %u", i);
+			ok = false;
+			break;
+		}
+
+		gs_copy_texture(tex, texture->tex[i]);
+		gs_texture_destroy(tex);
+	}
+
+	for (guint32 i = 0; i < desc.num_objects; i++) {
+		close(desc.objects[i].fd);
+	}
+
+	return ok;
+}
+
+static bool encode_receive(obs_vaapi_t *vaapi, GstBuffer *buffer, struct encoder_packet *packet, bool *received_packet)
+{
+	g_mutex_lock(&vaapi->mutex);
+	vaapi->consumed = false;
+	g_mutex_unlock(&vaapi->mutex);
+
+	GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
+	if (ret != GST_FLOW_OK) {
+		return false;
+	}
+
+	g_mutex_lock(&vaapi->mutex);
+	while (!vaapi->consumed) {
+		g_cond_wait(&vaapi->cond, &vaapi->mutex);
+	}
+	g_mutex_unlock(&vaapi->mutex);
+
+	vaapi->sample = gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);
+	if (vaapi->sample == NULL) {
+		return true;
+	}
+
+	*received_packet = true;
+
+	buffer = gst_sample_get_buffer(vaapi->sample);
+
+	gst_buffer_map(buffer, &vaapi->info, GST_MAP_READ);
+
+	if (vaapi->codec_data == NULL) {
+		vaapi->codec_data = bmemdup(vaapi->info.data, vaapi->info.size);
+		vaapi->codec_size = vaapi->info.size;
+	}
+
+	packet->data = vaapi->info.data;
+	packet->size = vaapi->info.size;
+
+	packet->pts = GST_BUFFER_PTS(buffer);
+	packet->dts = GST_BUFFER_DTS(buffer);
+
+	packet->pts /= GST_SECOND / (packet->timebase_den / packet->timebase_num);
+	packet->dts /= GST_SECOND / (packet->timebase_den / packet->timebase_num);
+
+	packet->type = OBS_ENCODER_VIDEO;
+
+	packet->keyframe = !GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
+
+	return true;
 }
 
 static bool encode(void *data, struct encoder_frame *frame, struct encoder_packet *packet, bool *received_packet)
@@ -396,12 +671,7 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 
 	*received_packet = false;
 
-	if (vaapi->sample) {
-		GstBuffer *buffer = gst_sample_get_buffer(vaapi->sample);
-		gst_buffer_unmap(buffer, &vaapi->info);
-		gst_sample_unref(vaapi->sample);
-		vaapi->sample = NULL;
-	}
+	release_sample(vaapi);
 
 	GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
 	gsize buffer_size = 0;
@@ -447,52 +717,64 @@ static bool encode(void *data, struct encoder_frame *frame, struct encoder_packe
 
 	GST_BUFFER_PTS(buffer) = frame->pts * (GST_SECOND / (packet->timebase_den / packet->timebase_num));
 
-	g_mutex_lock(&vaapi->mutex);
+	return encode_receive(vaapi, buffer, packet, received_packet);
+}
 
-	GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(vaapi->appsrc), buffer);
-	if (ret != GST_FLOW_OK) {
+static bool encode_texture2(void *data, struct encoder_texture *texture, int64_t pts, uint64_t lock_key,
+			    uint64_t *next_key, struct encoder_packet *packet, bool *received_packet)
+{
+	obs_vaapi_t *vaapi = data;
+
+	UNUSED_PARAMETER(lock_key);
+	UNUSED_PARAMETER(next_key);
+
+	*received_packet = false;
+
+	release_sample(vaapi);
+
+	GstBuffer *buffer = gst_buffer_new();
+	if (!gst_va_dmabuf_allocator_prepare_buffer(vaapi->va_allocator, buffer) &&
+	    !gst_va_dmabuf_allocator_setup_buffer(vaapi->va_allocator, buffer)) {
+		blog(LOG_ERROR, "[obs-vaapi] failed to set up dmabuf buffer");
 		gst_buffer_unref(buffer);
 		return false;
 	}
 
-	g_cond_wait(&vaapi->cond, &vaapi->mutex);
-	g_mutex_unlock(&vaapi->mutex);
+	gst_buffer_add_video_meta_full(buffer, GST_VIDEO_FRAME_FLAG_NONE, GST_VIDEO_INFO_FORMAT(&vaapi->drm_info.vinfo),
+				       GST_VIDEO_INFO_WIDTH(&vaapi->drm_info.vinfo),
+				       GST_VIDEO_INFO_HEIGHT(&vaapi->drm_info.vinfo),
+				       GST_VIDEO_INFO_N_PLANES(&vaapi->drm_info.vinfo), vaapi->drm_info.vinfo.offset,
+				       vaapi->drm_info.vinfo.stride);
 
-	vaapi->sample = gst_app_sink_try_pull_sample(GST_APP_SINK(vaapi->appsink), 0);
-	if (vaapi->sample == NULL) {
-		return true;
+	obs_enter_graphics();
+
+	bool ok = copy_texture(vaapi, buffer, texture);
+
+	gs_flush();
+
+	obs_leave_graphics();
+
+	if (!ok) {
+		gst_buffer_unref(buffer);
+		return false;
 	}
 
-	*received_packet = true;
+	GST_BUFFER_PTS(buffer) = pts * (GST_SECOND / (packet->timebase_den / packet->timebase_num));
 
-	buffer = gst_sample_get_buffer(vaapi->sample);
+	gst_mini_object_weak_ref(GST_MINI_OBJECT(buffer), buffer_destroy_notify, vaapi);
 
-	gst_buffer_map(buffer, &vaapi->info, GST_MAP_READ);
-
-	if (vaapi->codec_data == NULL) {
-		vaapi->codec_data = bmemdup(vaapi->info.data, vaapi->info.size);
-		vaapi->codec_size = vaapi->info.size;
-	}
-
-	packet->data = vaapi->info.data;
-	packet->size = vaapi->info.size;
-
-	packet->pts = GST_BUFFER_PTS(buffer);
-	packet->dts = GST_BUFFER_DTS(buffer);
-
-	packet->pts /= GST_SECOND / (packet->timebase_den / packet->timebase_num);
-	packet->dts /= GST_SECOND / (packet->timebase_den / packet->timebase_num);
-
-	packet->type = OBS_ENCODER_VIDEO;
-
-	packet->keyframe = !GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
-
-	return true;
+	return encode_receive(vaapi, buffer, packet, received_packet);
 }
 
 static void get_defaults2(obs_data_t *settings, void *type_data)
 {
-	GstElement *encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
+	GstElement *encoder = NULL;
+
+	if (g_str_has_prefix(type_data, TEXTURE_PREFIX)) {
+		encoder = gst_element_factory_make(type_data + strlen(TEXTURE_PREFIX), NULL);
+	} else {
+		encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
+	}
 
 	guint num_properties;
 	GParamSpec **property_specs = g_object_class_list_properties(G_OBJECT_GET_CLASS(encoder), &num_properties);
@@ -512,47 +794,30 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 
 		g_object_get_property(G_OBJECT(encoder), param->name, &value);
 
-		gchar *str;
-		gint uint64;
-		gint int64;
-		gint uint32;
-		gint int32;
-		gboolean boolean;
-		gfloat float32;
-		gdouble float64;
-
 		switch (G_VALUE_TYPE(&value)) {
 		case G_TYPE_STRING:
-			g_object_get(encoder, param->name, &str, NULL);
-			obs_data_set_default_string(settings, param->name, str);
+			obs_data_set_default_string(settings, param->name, g_value_get_string(&value));
 			break;
 		case G_TYPE_UINT64:
-			g_object_get(encoder, param->name, &uint64, NULL);
-			obs_data_set_default_int(settings, param->name, uint64);
+			obs_data_set_default_int(settings, param->name, g_value_get_uint64(&value));
 			break;
 		case G_TYPE_INT64:
-			g_object_get(encoder, param->name, &int64, NULL);
-			obs_data_set_default_int(settings, param->name, int64);
+			obs_data_set_default_int(settings, param->name, g_value_get_int64(&value));
 			break;
 		case G_TYPE_UINT:
-			g_object_get(encoder, param->name, &uint32, NULL);
-			obs_data_set_default_int(settings, param->name, uint32);
+			obs_data_set_default_int(settings, param->name, g_value_get_uint(&value));
 			break;
 		case G_TYPE_INT:
-			g_object_get(encoder, param->name, &int32, NULL);
-			obs_data_set_default_int(settings, param->name, int32);
+			obs_data_set_default_int(settings, param->name, g_value_get_int(&value));
 			break;
 		case G_TYPE_BOOLEAN:
-			g_object_get(encoder, param->name, &boolean, NULL);
-			obs_data_set_default_bool(settings, param->name, boolean);
+			obs_data_set_default_bool(settings, param->name, g_value_get_boolean(&value));
 			break;
 		case G_TYPE_FLOAT:
-			g_object_get(encoder, param->name, &float32, NULL);
-			obs_data_set_default_double(settings, param->name, float32);
+			obs_data_set_default_double(settings, param->name, g_value_get_float(&value));
 			break;
 		case G_TYPE_DOUBLE:
-			g_object_get(encoder, param->name, &float64, NULL);
-			obs_data_set_default_double(settings, param->name, float64);
+			obs_data_set_default_double(settings, param->name, g_value_get_double(&value));
 			break;
 		default:
 			if (G_IS_PARAM_SPEC_ENUM(param)) {
@@ -587,7 +852,14 @@ static void get_defaults2(obs_data_t *settings, void *type_data)
 
 static obs_properties_t *get_properties2(void *data, void *type_data)
 {
-	GstElement *encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
+	GstElement *encoder = NULL;
+
+	if (g_str_has_prefix(type_data, TEXTURE_PREFIX)) {
+		encoder = gst_element_factory_make(type_data + strlen(TEXTURE_PREFIX), NULL);
+	} else {
+		encoder = gst_element_factory_make(type_data + strlen("obs-va-"), NULL);
+	}
+
 	obs_property_t *property = NULL;
 
 	obs_properties_t *properties = obs_properties_create();
@@ -748,9 +1020,22 @@ MODULE_EXPORT bool obs_module_load(void)
 		}
 		g_strfreev(fields);
 
+		vaapi.encode = encode;
+		vaapi.encode_texture2 = NULL;
+		vaapi.caps = 0;
+
 		vaapi.id = vaapi.type_data = g_strdup_printf("obs-va-%s", gst_plugin_feature_get_name(feature));
 		g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
 		obs_register_encoder(&vaapi);
+
+		vaapi.encode = NULL;
+		vaapi.encode_texture2 = encode_texture2;
+		vaapi.caps = OBS_ENCODER_CAP_PASS_TEXTURE;
+
+		vaapi.id = vaapi.type_data = g_strdup_printf(TEXTURE_PREFIX "%s", gst_plugin_feature_get_name(feature));
+		g_hash_table_insert(hash_table, vaapi.type_data, vaapi.type_data);
+		obs_register_encoder(&vaapi);
+
 		blog(LOG_INFO, "[obs-vaapi] found %s", gst_plugin_feature_get_name(feature));
 	}
 

@@ -20,7 +20,7 @@
 
 project('obs-vaapi', 'c',
   default_options : [
-    'prefix=~/.config/obs-studio/plugins/obs-vaapi/bin/64bit',
+    'prefix=~/.local/share/obs-studio/plugins/obs-vaapi',
     'libdir='
   ],
 )

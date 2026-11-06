@@ -2,14 +2,21 @@ on: push
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/fzwoch/obs-vaapi
+    container: fzwoch/klumpatsch
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build x86_64
+      - name: Install dependencies
         run: |
-          meson setup --buildtype=release -Dlibobs=disabled -Dc_args=-I/obs -Dc_link_args='-Wl,--unresolved-symbols=ignore-all -static-libgcc' x86_64
+          apt update
+          apt install -y pkg-config libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev libva-dev libpci-dev libobs-dev
+
+      - name: Build x86_64
+        env:
+          PKG_CONFIG: pkg-config
+        run: |
+          meson setup --buildtype=release --cross-file=/meson/linux-x86_64.txt x86_64
           meson compile -C x86_64
 
       - name: Upload artifacts

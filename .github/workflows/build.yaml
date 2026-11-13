@@ -10,7 +10,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt update
-          apt install -y pkg-config libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev libva-dev libpci-dev libobs-dev
+          apt install -y pkg-config libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev libva-dev libdrm-dev libpci-dev libobs-dev
 
       - name: Build x86_64
         env:
